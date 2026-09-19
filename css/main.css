@@ -1,0 +1,223 @@
+/* MAS S60 — Digital Self. White, minimal: the chrome head stands on the
+ * bottom edge of the screen; page background matches the clip's pure white. */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+  color: #2a3a47;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+#face {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* video face layers (FaceVideo), crossfaded by toggling .front.
+ * Full height, bottom flush with the viewport bottom, centered. */
+.face-video {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  height: 100vh;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+.face-video.front { opacity: 1; }
+
+/* subtitle: only visible while the agent speaks, then fades */
+#subtitle {
+  position: fixed;
+  bottom: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 60ch;
+  text-align: center;
+  font-size: 18px;
+  line-height: 1.5;
+  color: #54687a;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.9);
+}
+#subtitle.visible { opacity: 1; }
+
+/* input bar: hidden until a key is pressed or the face is clicked */
+#input-bar {
+  position: fixed;
+  bottom: 5vh;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+#input-bar.visible { opacity: 1; }
+#input-bar.hidden { display: none; }
+
+#query {
+  width: min(520px, 70vw);
+  padding: 10px 16px;
+  font-size: 16px;
+  color: #1a2733;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #b8c8d4;
+  border-radius: 22px;
+  outline: none;
+  box-shadow: 0 2px 14px rgba(42, 58, 71, 0.08);
+}
+#query:focus { border-color: #0891b2; }
+
+#mic-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #b8c8d4;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0891b2;
+  font-size: 14px;
+  cursor: pointer;
+}
+#mic-btn.listening { color: #ef5350; border-color: #ef5350; }
+
+/* memory panel: documents the agent "pulls out" of its memory */
+#memory-panel {
+  position: fixed;
+  top: 6vh;
+  right: 4vw;
+  bottom: 6vh;
+  width: min(560px, 44vw);
+  background: rgba(12, 18, 24, 0.94);
+  border: 1px solid #27404f;
+  border-radius: 10px;
+  box-shadow: 0 0 40px rgba(9, 30, 45, 0.25);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(0);
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.5s ease;
+  z-index: 10;
+}
+#memory-panel.hidden {
+  transform: translateX(60vw);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#memory-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid #1d2c38;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4fc3f7;
+}
+
+#memory-close {
+  background: none;
+  border: none;
+  color: #9fb3c8;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+#memory-content {
+  padding: 18px 22px;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #cfd8dc;
+}
+#memory-content h1, #memory-content h2, #memory-content h3 {
+  color: #dfe9f0;
+  margin: 0.9em 0 0.4em;
+}
+#memory-content h1 { font-size: 22px; }
+#memory-content h2 { font-size: 18px; }
+#memory-content h3 { font-size: 16px; }
+#memory-content p { margin: 0.6em 0; }
+#memory-content ul, #memory-content ol { margin: 0.6em 0 0.6em 1.4em; }
+#memory-content a { color: #4fc3f7; }
+#memory-content code {
+  background: #141c24;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+#memory-content pre {
+  background: #141c24;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+#memory-content pre code { padding: 0; background: none; }
+#memory-content img { max-width: 100%; border-radius: 6px; }
+#memory-content hr { border: none; border-top: 1px solid #1d2c38; margin: 1.2em 0; }
+
+/* grader fallback: plain index overlay */
+#index-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 10, 0.96);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+#index-overlay.hidden { display: none; }
+#index-inner { max-width: 640px; width: 90%; }
+#index-inner h1 {
+  font-size: 28px;
+  color: #4fc3f7;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+#index-list a {
+  display: block;
+  padding: 12px 4px;
+  color: #dfe9f0;
+  text-decoration: none;
+  border-bottom: 1px solid #1d2c38;
+  font-size: 17px;
+}
+#index-list a:hover { color: #4fc3f7; }
+#index-list .section-label {
+  margin-top: 22px;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #607d8b;
+}
+.index-hint { margin-top: 28px; font-size: 12px; color: #546e7a; }
+
+/* tiny dot bottom-right: the only permanent UI element */
+#index-dot {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: none;
+  background: #94a9bb;
+  cursor: pointer;
+  opacity: 0.7;
+  z-index: 15;
+}
+#index-dot:hover { background: #0891b2; opacity: 1; }

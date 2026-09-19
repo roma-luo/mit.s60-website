@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roma Luo — Digital Self · MAS S60</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <canvas id="face"></canvas>
+
+  <div id="subtitle"></div>
+
+  <div id="memory-panel" class="hidden">
+    <div id="memory-panel-header">
+      <span id="memory-title"></span>
+      <button id="memory-close" aria-label="close">&times;</button>
+    </div>
+    <div id="memory-content"></div>
+  </div>
+
+  <div id="input-bar" class="hidden">
+    <button id="mic-btn" title="hold to speak">&#9679;</button>
+    <input id="query" type="text" placeholder="ask me anything..." autocomplete="off">
+  </div>
+
+  <div id="index-overlay" class="hidden">
+    <div id="index-inner">
+      <h1>Index</h1>
+      <div id="index-list"></div>
+      <p class="index-hint">press Esc or click anywhere to return</p>
+    </div>
+  </div>
+
+  <button id="index-dot" title="index"></button>
+
+  <script src="js/markdown.js"></script>
+  <script src="js/face.js"></script>
+  <script src="js/facevideo.js"></script>
+  <script src="js/voice.js"></script>
+  <script src="js/memory.js"></script>
+  <script src="js/rag.js"></script>
+  <script src="js/brain.js"></script>
+  <script src="js/ollama.js"></script>
+  <script src="js/agent.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

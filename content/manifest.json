@@ -1,0 +1,65 @@
+{
+  "persona": {
+    "name": "Roma Luo",
+    "firstName": "Roma",
+    "affiliation": "Harvard University, Graduate School of Design",
+    "course": "MAS.S60 at the MIT Media Lab (cross-registered), a course on AI agents",
+    "style": "first person, plain spoken English, concise"
+  },
+  "entries": [
+    {
+      "id": "self",
+      "title": "Who I am — Roma Luo",
+      "section": "meta",
+      "tags": ["roma", "luo", "name", "identity", "harvard", "gsd", "mit", "media", "lab", "student", "who"],
+      "keywords": ["roma", "your name", "who are you", "harvard", "graduate school of design", "media lab", "where do you study"],
+      "file": "content/self.md",
+      "answer": "I'm the digital self of Roma Luo. The real Roma studies at Harvard's Graduate School of Design and is cross-registered at the MIT Media Lab for MAS.S60, the AI agents course. Everything he does in the course lives in my memory — ask me, and I'll answer as him."
+    },
+    {
+      "id": "about",
+      "title": "About — what this site is",
+      "section": "meta",
+      "tags": ["about", "site", "concept", "digital", "self", "how"],
+      "keywords": ["this site", "this website", "digital self", "concept", "what is this", "how does this work"],
+      "file": "content/about.md",
+      "answer": "This site is me — Roma's digital self for MAS S60. Every week of work, every idea and failure, is linked into my memory. Ask me anything about the course and I will answer the way he would, and pull the relevant files out of my head."
+    },
+    {
+      "id": "week1",
+      "title": "Week 1 — Minimal agent loop, website, project ideas",
+      "section": "week 1",
+      "tags": ["week1", "agent", "loop", "website", "documentation"],
+      "keywords": ["week 1", "week one", "first week", "what did you do", "agent loop", "your agent", "homework"],
+      "file": "content/week1/index.md",
+      "answer": "In week one I built three things: this website, three final project ideas, and a small LLM agent written from scratch — a hand-written loop around a local model, no frameworks. Let me pull up the full documentation."
+    },
+    {
+      "id": "fp-1",
+      "title": "Final project idea 1 — TBD",
+      "section": "final project",
+      "tags": ["final", "project", "idea", "proposal"],
+      "keywords": ["idea 1", "first idea", "project idea one"],
+      "file": "content/final-project/idea-1.md",
+      "answer": "The first project direction is still being drafted. Here is what I have so far."
+    },
+    {
+      "id": "fp-2",
+      "title": "Final project idea 2 — TBD",
+      "section": "final project",
+      "tags": ["final", "project", "idea", "proposal"],
+      "keywords": ["idea 2", "second idea", "project idea two"],
+      "file": "content/final-project/idea-2.md",
+      "answer": "The second project direction is still being drafted. Here is what I have so far."
+    },
+    {
+      "id": "fp-3",
+      "title": "Final project idea 3 — TBD",
+      "section": "final project",
+      "tags": ["final", "project", "idea", "proposal"],
+      "keywords": ["idea 3", "third idea", "project idea three"],
+      "file": "content/final-project/idea-3.md",
+      "answer": "The third project direction is still being drafted. Here is what I have so far."
+    }
+  ]
+}
