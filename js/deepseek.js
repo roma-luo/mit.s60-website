@@ -14,6 +14,11 @@ const DeepseekBrain = (() => {
   const enabled = /(?:\?|&)brain=deepseek\b/.test(location.search)
                || (!isLocal && !hasBrainParam);
 
+  // a 404/405 from the proxy means this host has no backend at all (e.g.
+  // GitHub Pages) — after one such failure, disable for the rest of the
+  // session instead of eating a 404 round-trip per question
+  let disabled = false;
+
   async function chat(messages) {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -28,5 +33,14 @@ const DeepseekBrain = (() => {
     return text;
   }
 
-  return { enabled, answer: q => AgentLoop.answer(q, chat) };
+  async function answer(q) {
+    if (disabled) throw new Error('deepseek disabled for session');
+    try { return await AgentLoop.answer(q, chat); }
+    catch (e) {
+      if (/proxy http (404|405)/.test(e.message)) disabled = true;
+      throw e;
+    }
+  }
+
+  return { enabled, answer };
 })();

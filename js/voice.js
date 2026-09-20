@@ -81,15 +81,16 @@ const Voice = (() => {
       if (onEnd) onEnd();
     };
 
-    // B2 watchdog: no utterance event ever fires → force completion
-    watchdogTimer = setTimeout(done, text.length * 60 + 3000);
-
     speaking = true;
 
     const speakNext = () => {
       if (!isCurrent() || !speaking) return;
       if (idx >= chunks.length) { done(); return; }
       const chunk = chunks[idx];
+      // watchdog re-arms per chunk (~120ms/char + 4s slack) instead of one
+      // whole-text estimate, which cut long answers off mid-speech
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      watchdogTimer = setTimeout(done, chunk.length * 120 + 4000);
       const offset = charOffset;
       const u = new SpeechSynthesisUtterance(chunk);
       if (voice) u.voice = voice;

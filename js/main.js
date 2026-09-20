@@ -552,6 +552,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   input.addEventListener('keydown', ev => {
     if (ev.key === 'Enter' && !ev.shiftKey) {
+      if (ev.isComposing || ev.keyCode === 229) return; // IME: Enter picks a candidate, don't send
       ev.preventDefault();
       const q = input.value;
       input.value = '';

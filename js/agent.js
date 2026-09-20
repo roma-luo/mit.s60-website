@@ -58,7 +58,10 @@ const Agent = (() => {
                       : null;
       if (liveBrain) {
         try { res = await liveBrain.answer(query); }
-        catch (err) { console.warn('live brain failed, falling back to static brain:', err); }
+        catch (err) {
+          console.warn('live brain failed, falling back to static brain:', err);
+          UI.setMode('static'); // reflect the fallback in the INPUT meta Mode row
+        }
       }
       if (!res) {
         try { res = await Brain.answer(query); }
