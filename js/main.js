@@ -113,8 +113,9 @@ const UI = (() => {
     setWire($(name), $(name + '-a'), $(name + '-b'), x1, y1, x2, y2, vertical);
   }
 
-  // one wire per child, created on demand and keyed by the child's data-id
-  function childWireEls(svg, id) {
+  // one wire per child, created on demand and keyed by the child's data-id;
+  // a freshly spawned wire draws itself on (dashoffset 1 → 0, 300ms)
+  function childWireEls(svg, id, animate) {
     let path = svg.querySelector('path.wire-child[data-for="' + id + '"]');
     if (path) {
       return {
@@ -137,18 +138,31 @@ const UI = (() => {
     svg.appendChild(path);
     svg.appendChild(dotA);
     svg.appendChild(dotB);
+    if (animate) {
+      path.setAttribute('pathLength', '1');
+      path.style.strokeDasharray = '1';
+      path.style.strokeDashoffset = '1';
+      path.style.transition = 'stroke-dashoffset .3s ease';
+      requestAnimationFrame(() => { path.style.strokeDashoffset = '0'; });
+      setTimeout(() => {
+        path.removeAttribute('pathLength');
+        path.style.strokeDasharray = '';
+        path.style.strokeDashoffset = '';
+        path.style.transition = '';
+      }, 320);
+    }
     return { path, dotA, dotB };
   }
 
   // every child card gets one wire from OUTPUT's right-edge midpoint — a fan
   // with a single shared origin (mobile chain variant lands in a later step)
-  function syncChildWires(rel, ro) {
+  function syncChildWires(rel, ro, animate) {
     const svg = $('wires');
     const seen = new Set();
     for (const card of $('children').children) {
       const id = card.dataset.id;
       seen.add(id);
-      const { path, dotA, dotB } = childWireEls(svg, id);
+      const { path, dotA, dotB } = childWireEls(svg, id, animate);
       const rc = rel(card);
       setWire(path, dotA, dotB, ro.r, ro.t + ro.h / 2, rc.l, rc.t + rc.h / 2);
     }
@@ -157,7 +171,8 @@ const UI = (() => {
     }
   }
 
-  function updateWires() {
+  function updateWires(animateNew) {
+    const anim = animateNew === true; // ResizeObserver/events pass objects
     const svg = $('wires');
     const graph = $('graph');
     // the svg spans the whole graph; all points are in canvas space
@@ -185,7 +200,7 @@ const UI = (() => {
       setNamedWire('wire-in', ri.r, ri.t + ri.h / 2, rs.l, rs.t + rs.h / 2);
       setNamedWire('wire-out', rs.r, rs.t + rs.h / 2, ro.l, ro.t + ro.h / 2);
     }
-    syncChildWires(rel, ro);
+    syncChildWires(rel, ro, anim);
   }
 
   /* ---- OUTPUT node (text only; attached docs live in child nodes) */
@@ -358,26 +373,42 @@ const UI = (() => {
     spawnRound = null;
   }
 
-  // §3.3: previous round's cards leave, then one card per entry appears
-  // (stagger + wire draw-on land with the animation step)
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+
+  // §3.3: previous round's cards fade out together and leave; then the new
+  // cards appear one by one (~220ms apart), each sliding in over 120ms while
+  // its wire draws itself on; the last card is auto-revealed into view
   async function spawnChildren(entries, round) {
     const myGen = ++spawnGen;
     spawnRound = round;
     const alive = () => myGen === spawnGen && (round === undefined || round === spawnRound);
     const host = $('children');
     host.classList.remove('dim');
-    for (const card of [...host.children]) {
-      if (nodeObserver) nodeObserver.unobserve(card);
-      card.remove();
+
+    const old = [...host.children];
+    if (old.length) {
+      for (const card of old) card.classList.add('leaving');
+      await delay(120);
+      for (const card of old) {
+        if (nodeObserver) nodeObserver.unobserve(card);
+        card.remove();
+      }
+      updateWires();
     }
+    if (!alive()) return;
     setAttached(entries.length);
+
     let last = null;
     for (const entry of entries) {
       if (!alive()) break;
+      if (last) await delay(220);
+      if (!alive()) break;
       const card = buildChild(entry);
+      card.classList.add('entering');
       host.appendChild(card);
       if (nodeObserver) nodeObserver.observe(card);
-      updateWires();
+      requestAnimationFrame(() => card.classList.remove('entering'));
+      updateWires(true);
       last = card;
     }
     if (last && alive() && typeof Canvas !== 'undefined') Canvas.reveal(last);
