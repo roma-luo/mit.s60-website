@@ -1,3 +1,12 @@
+---
+id: fp-2
+label: FINAL IDEA 02
+title: Idea 2 — Braindance: Sellable Agent Memories of Lived Expertise
+section: final project
+answer: Idea two: Braindance, inspired by Cyberpunk 2077. An agent works alongside an expert for months, builds a structured memory of their decisions and judgment, and packages it as a portable, sellable experience file. A learner's agent can then replay that judgment in similar situations. It augments learning and intuition, and it asks who should own a memory: my answer is, the person who lived it.
+tags: [final, project, idea, proposal, braindance, expertise, memory, learning]
+keywords: [idea 2, second idea, project idea two, braindance, cyberpunk, expertise, experience file, sellable memory, apprenticeship]
+---
 # Final Project Idea 2: Braindance — Sellable Agent Memories of Lived Expertise
 
 > *Inspired by braindance in Cyberpunk 2077: a recording of someone's lived experience that another person can replay and feel. What if an agent's memory of an expert's way of thinking could be "replayed" the same way?*

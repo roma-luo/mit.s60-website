@@ -1,3 +1,12 @@
+---
+id: fp-1
+label: FINAL IDEA 01
+title: Idea 1 — A Personal Agent That Remembers and Predicts
+section: final project
+answer: Idea one: a personal agent that remembers and predicts. It observes how you actually work, your real task durations and abandoned goals, and makes simple predictions, like warning that a task will take you three hours, not one. Each prediction is later checked against reality so it improves over time. It augments honest self-memory: it shows you patterns about yourself that you cannot see alone.
+tags: [final, project, idea, proposal, memory, prediction, planning, behavior]
+keywords: [idea 1, first idea, project idea one, remembers and predicts, personal agent, planning mistakes, deadlines, self memory]
+---
 # Final Project Idea 1: A Personal Agent That Remembers and Predicts
 
 **Who it is for:** Students and knowledge workers who keep repeating the same planning mistakes — missing deadlines, underestimating tasks, forgetting commitments.

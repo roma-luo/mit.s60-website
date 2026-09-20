@@ -1,3 +1,12 @@
+---
+id: about
+label: ABOUT
+title: About — what this site is
+section: meta
+answer: This site is me — Roma's digital self for MAS S60. Every week of work, every idea and failure, is linked into my memory. Ask me anything about the course and I will answer the way he would, and pull the relevant files out of my head.
+tags: [about, site, concept, digital, self, how]
+keywords: [this site, this website, digital self, concept, what is this, how does this work]
+---
 # About — what this site is
 
 This website is an agent. More precisely: it is the digital self of **Roma Luo** (Harvard GSD, cross-registered at the MIT Media Lab), built for MAS S60.

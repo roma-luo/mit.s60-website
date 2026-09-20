@@ -1,3 +1,12 @@
+---
+id: week1
+label: WEEK 01
+title: Week 1 — Minimal agent loop, website, project ideas
+section: week 1
+answer: In week one I built three things: this website, three final project ideas, and a small LLM agent written from scratch — a hand-written loop around a local model, no frameworks. Let me pull up the full documentation.
+tags: [week1, agent, loop, website, documentation]
+keywords: [week 1, week one, first week, what did you do, agent loop, your agent, homework]
+---
 # Week 1 — Minimal agent loop, website, project ideas
 
 *Due Sep 21, 2026. This page documents: (1) this website, (2) three final project ideas, (3) an agent built from scratch.*

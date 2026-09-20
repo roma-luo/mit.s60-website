@@ -1,3 +1,12 @@
+---
+id: fp-3
+label: FINAL IDEA 03
+title: Idea 3 — Attention Guardian: An Agent That Reassembles Your Fragmented Information
+section: final project
+answer: Idea three: Attention Guardian. It learns when you enter deep work and holds back non-urgent interruptions, then weaves the day's fragments, messages, articles, emails, into one coherent summary. Fragments arrive on your phone's schedule; understanding is delivered on yours. It augments attention and synthesis.
+tags: [final, project, idea, proposal, attention, focus, synthesis, notifications]
+keywords: [idea 3, third idea, project idea three, attention guardian, fragmented attention, deep work, notifications, synthesis]
+---
 # Final Project Idea 3: Attention Guardian — An Agent That Reassembles Your Fragmented Information
 
 **Who it is for:** Students and knowledge workers whose attention is shattered across dozens of channels — notifications, group chats, emails, open browser tabs — and who end the day busy but unable to say what they actually took in.
