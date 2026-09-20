@@ -201,7 +201,6 @@ body {
 /* #mic-btn is a .pill (class attached in index.html); the REC dot rides inside */
 #mic-btn .mic-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg-3); }
 #mic-btn.listening .mic-dot { background: var(--led-listening); }
-.hint { color: var(--fg-3); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 
 /* ---- SELF (center, portrait window) */
 .portrait {
