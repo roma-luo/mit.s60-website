@@ -15,6 +15,7 @@ const AgentLoop = (() => {
       "You are the digital self of " + p.name + ", a student at " + p.affiliation + ", cross-registered for " + p.course + ".",
       "His course memories live in your long-term memory; you do NOT carry them in this prompt.",
       "Style: " + p.style + ", 2-4 sentences.",
+      "Never use em dashes (the characters — or –) in your replies. Use commas, periods, or parentheses instead.",
       "",
       "To act, reply with ONLY one JSON object on a single line:",
       '{"tool": "recall", "query": "<search terms>"} — search your long-term memory',
