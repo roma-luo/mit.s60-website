@@ -1,19 +1,35 @@
 #!/usr/bin/env node
-/* build-index.mjs — generate content/manifest.json from every .md under
- * content/ (recursive). Front matter carries the metadata; the manifest is
- * a build artifact now. (Chunking + the embedding/BM25 search index land
- * in the next step.)
+/* build-index.mjs — build artifacts for the memory vault:
+ *   content/manifest.json  — entries generated from .md front matter
+ *   content/index.json     — chunks (+ vectors when OPENAI_API_KEY is set)
+ *                            + tf/df for BM25, for /api/recall hybrid search
+ *
+ * Incremental: a chunk is re-embedded only when its sha1 changes
+ * (content/.embed-cache.json). Without OPENAI_API_KEY the script still
+ * emits everything except vectors (BM25-only index) with a warning —
+ * Vercel supplies the key at build time.
  *
  * Zero dependencies by design: the front-matter parser is hand-rolled
  * (flat `key: value`, inline `[a, b]` arrays, single-line values only).
  */
 import { readFile, writeFile, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { tokenize } from '../lib/tokens.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const CONTENT = path.join(ROOT, 'content');
+const MANIFEST = path.join(CONTENT, 'manifest.json');
+const INDEX = path.join(CONTENT, 'index.json');
+const CACHE = path.join(CONTENT, '.embed-cache.json');
+
+const EMBED_MODEL = 'text-embedding-3-small';
+const EMBED_DIMS = 512;
+const CHUNK_MAX = 1200;
+const CHUNK_OVERLAP = 150;
+const EMBED_BATCH = 100;
 
 export function parseFrontMatter(src) {
   const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
@@ -79,14 +95,125 @@ export async function buildEntries() {
   return entries;
 }
 
+/* split long text at paragraph boundaries when possible, hard-cut
+ * otherwise, with a CHUNK_OVERLAP-char tail carried into the next part */
+export function splitLong(text, max = CHUNK_MAX, overlap = CHUNK_OVERLAP) {
+  const parts = [];
+  let rest = text;
+  while (rest.length > max) {
+    let cut = rest.lastIndexOf('\n\n', max);
+    if (cut < max * 0.5) cut = max; // no good paragraph break: hard cut
+    parts.push(rest.slice(0, cut));
+    rest = rest.slice(Math.max(0, cut - overlap));
+  }
+  if (rest.trim()) parts.push(rest);
+  return parts;
+}
+
+/* one doc → retrieval chunks: split by `## ` headings (content before the
+ * first heading is its own section), over-long sections split with overlap;
+ * every chunk is prefixed "title > heading" for embedding context */
+export function chunkDoc(title, body) {
+  const sections = [];
+  let cur = { heading: '', lines: [] };
+  for (const line of body.split('\n')) {
+    const m = line.match(/^##\s+(.*)$/);
+    if (m) { sections.push(cur); cur = { heading: m[1].trim(), lines: [] }; }
+    else cur.lines.push(line);
+  }
+  sections.push(cur);
+
+  const chunks = [];
+  for (const s of sections) {
+    const text = s.lines.join('\n').trim();
+    if (!text) continue;
+    for (const part of text.length <= CHUNK_MAX ? [text] : splitLong(text)) {
+      chunks.push({ heading: s.heading, text: part, prefixed: `${title} > ${s.heading}\n${part}` });
+    }
+  }
+  return chunks;
+}
+
+const sha1 = s => createHash('sha1').update(s).digest('hex');
+const round5 = v => Math.round(v * 1e5) / 1e5;
+
+async function embedBatch(texts, key) {
+  const res = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+    body: JSON.stringify({ model: EMBED_MODEL, input: texts, dimensions: EMBED_DIMS })
+  });
+  if (!res.ok) throw new Error('openai embeddings http ' + res.status + ': ' + (await res.text()).slice(0, 200));
+  const data = await res.json();
+  return data.data.map(d => d.embedding.map(round5));
+}
+
 async function main() {
+  /* ---- manifest */
   const persona = JSON.parse(await readFile(path.join(CONTENT, 'persona.json'), 'utf8'));
   const entries = await buildEntries();
-  const manifest = { persona, entries };
-  const out = path.join(CONTENT, 'manifest.json');
-  await writeFile(out, JSON.stringify(manifest, null, 2) + '\n');
-  console.log(`manifest: ${entries.length} entries → ${path.relative(ROOT, out)}`);
-  for (const e of entries) console.log(`  ${e.id}  [${e.label}]  ${e.title}`);
+  await writeFile(MANIFEST, JSON.stringify({ persona, entries }, null, 2) + '\n');
+  console.log(`manifest: ${entries.length} entries`);
+
+  /* ---- chunks */
+  const chunks = [];
+  for (const e of entries) {
+    const { body } = parseFrontMatter(await readFile(path.join(ROOT, e.file), 'utf8'));
+    chunkDoc(e.title, body).forEach((c, i) => {
+      chunks.push({ id: `${e.id}#${i}`, docId: e.id, heading: c.heading, text: c.text, prefixed: c.prefixed, sha: sha1(c.prefixed) });
+    });
+  }
+  console.log(`chunks: ${chunks.length} from ${entries.length} docs`);
+
+  /* ---- incremental embedding */
+  let cache = {};
+  try { cache = JSON.parse(await readFile(CACHE, 'utf8')); } catch (e) { /* first run */ }
+  const key = process.env.OPENAI_API_KEY || '';
+  const stale = chunks.filter(c => !cache[c.id] || cache[c.id].sha !== c.sha);
+  let embedded = 0;
+  if (!stale.length) {
+    console.log('embeddings: all chunks cached, nothing to do');
+  } else if (!key) {
+    console.warn(`WARNING: OPENAI_API_KEY not set — building BM25-only index (${stale.length} chunks un-embedded). Set it and re-run to add vectors.`);
+  } else {
+    try {
+      for (let i = 0; i < stale.length; i += EMBED_BATCH) {
+        const batch = stale.slice(i, i + EMBED_BATCH);
+        const vecs = await embedBatch(batch.map(c => c.prefixed), key);
+        batch.forEach((c, j) => { cache[c.id] = { sha: c.sha, vec: vecs[j] }; });
+        embedded += batch.length;
+        console.log(`embedded ${embedded}/${stale.length}`);
+      }
+    } catch (err) {
+      // a bad key / quota / network must never break the build
+      console.warn(`WARNING: embedding failed (${err.message}) — continuing BM25-only.`);
+    }
+  }
+
+  /* ---- index.json: chunks (+vecs when cached) + tf/df for BM25 */
+  const outChunks = chunks.map(c => {
+    const tf = {};
+    for (const t of tokenize(c.prefixed)) tf[t] = (tf[t] || 0) + 1;
+    const cached = cache[c.id];
+    const out = { id: c.id, docId: c.docId, heading: c.heading, text: c.text, tf };
+    if (cached && cached.sha === c.sha && cached.vec) out.vec = cached.vec;
+    return out;
+  });
+  const df = {};
+  for (const c of outChunks) for (const t of Object.keys(c.tf)) df[t] = (df[t] || 0) + 1;
+  const index = {
+    model: EMBED_MODEL,
+    dims: EMBED_DIMS,
+    builtAt: new Date().toISOString(),
+    chunks: outChunks,
+    df,
+    n: outChunks.length
+  };
+  await writeFile(INDEX, JSON.stringify(index));
+  await writeFile(CACHE, JSON.stringify(cache));
+  const vecd = outChunks.filter(c => c.vec).length;
+  console.log(`index: ${outChunks.length} chunks (${vecd} with vectors) → ${path.relative(ROOT, INDEX)}`);
+  console.log(`embedded ${embedded} / skipped ${chunks.length - embedded}`);
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
