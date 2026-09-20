@@ -154,21 +154,33 @@ const UI = (() => {
     return { path, dotA, dotB };
   }
 
-  // every child card gets one wire from OUTPUT's right-edge midpoint — a fan
-  // with a single shared origin (mobile chain variant lands in a later step)
-  function syncChildWires(rel, ro, animate) {
+  // desktop: every child gets one wire from OUTPUT's right-edge midpoint — a
+  // fan with a single shared origin. mobile (<700px): chain instead —
+  // OUTPUT bottom → child1 top, child1 bottom → child2 top … (a fan would
+  // cross itself in the vertical stack). Returns the last child's rect.
+  function syncChildWires(rel, ro, animate, mobile) {
     const svg = $('wires');
     const seen = new Set();
+    const from = { x: mobile ? ro.l + ro.w / 2 : ro.r, y: mobile ? ro.b : ro.t + ro.h / 2 };
+    let lastRect = null;
     for (const card of $('children').children) {
       const id = card.dataset.id;
       seen.add(id);
       const { path, dotA, dotB } = childWireEls(svg, id, animate);
       const rc = rel(card);
-      setWire(path, dotA, dotB, ro.r, ro.t + ro.h / 2, rc.l, rc.t + rc.h / 2);
+      if (mobile) {
+        setWire(path, dotA, dotB, from.x, from.y, rc.l + rc.w / 2, rc.t, true);
+        from.x = rc.l + rc.w / 2;
+        from.y = rc.b;
+      } else {
+        setWire(path, dotA, dotB, from.x, from.y, rc.l, rc.t + rc.h / 2);
+      }
+      lastRect = rc;
     }
     for (const el of svg.querySelectorAll('[data-for]')) {
       if (!seen.has(el.dataset.for)) el.remove();
     }
+    return lastRect;
   }
 
   function updateWires(animateNew) {
@@ -192,15 +204,17 @@ const UI = (() => {
     const rs = rel($('node-self'));
     const ro = rel($('node-output'));
     if (window.innerWidth < 700) {
-      // mobile stacks SELF → OUTPUT → INPUT: same bezier, vertical axis
+      // mobile stacks SELF → OUTPUT → children → INPUT, wires chained vertically
       setNamedWire('wire-in', rs.l + rs.w / 2, rs.b, ro.l + ro.w / 2, ro.t, true);
-      setNamedWire('wire-out', ro.l + ro.w / 2, ro.b, ri.l + ri.w / 2, ri.t, true);
+      const lastChild = syncChildWires(rel, ro, anim, true);
+      const spine = lastChild || ro; // wire-out leaves from the last child
+      setNamedWire('wire-out', spine.l + spine.w / 2, spine.b, ri.l + ri.w / 2, ri.t, true);
     } else {
       // INPUT right-edge midpoint → SELF left-edge midpoint; SELF → OUTPUT same
       setNamedWire('wire-in', ri.r, ri.t + ri.h / 2, rs.l, rs.t + rs.h / 2);
       setNamedWire('wire-out', rs.r, rs.t + rs.h / 2, ro.l, ro.t + ro.h / 2);
+      syncChildWires(rel, ro, anim, false);
     }
-    syncChildWires(rel, ro, anim);
   }
 
   /* ---- OUTPUT node (text only; attached docs live in child nodes) */

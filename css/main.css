@@ -307,7 +307,8 @@ body {
   #graph { flex-direction: column; gap: 32px; padding: 4vh 5vw; width: auto; min-width: 0; }
   #node-self { order: 1; }
   #node-output { order: 2; width: auto; }
-  #node-input { order: 3; width: auto; position: sticky; bottom: 0; }
-  #children { order: 4; }   /* stopgap: mobile chain order lands in a later step */
+  #children { order: 3; align-self: stretch; gap: 20px; }
+  .child, .child.expanded { width: auto; }
+  #node-input { order: 4; width: auto; position: sticky; bottom: 0; }
   .portrait { height: min(38vh, 320px); }
 }
