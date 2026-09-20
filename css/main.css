@@ -74,8 +74,9 @@ body {
 
 .hidden { display: none !important; }
 
-/* ---- the canvas: the layer that gets translate()d when panning */
-#canvas { position: absolute; left: 0; top: 0; will-change: transform; cursor: grab; }
+/* ---- the canvas: the layer that gets translate()d / scale()d */
+#canvas { position: absolute; left: 0; top: 0; will-change: transform; transform-origin: 0 0; cursor: grab; }
+#canvas.zooming { transition: transform .45s ease; }   /* only programmatic zoom/reset eases; drags stay immediate */
 #canvas.panning { cursor: grabbing; }
 #canvas .node { cursor: auto; }
 

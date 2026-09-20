@@ -217,9 +217,13 @@ const UI = (() => {
     svg.setAttribute('height', h);
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
     const c = $('canvas').getBoundingClientRect();
+    // divide rect deltas by the live visual zoom (canvas rect vs its layout
+    // width) so wires stay in canvas/layout space at any zoom level — glued
+    // to the cards even mid-zoom-transition
+    const z = c.width / Math.max(1, $('canvas').offsetWidth);
     const rel = el => {
       const r = el.getBoundingClientRect();
-      return { l: r.left - c.left, t: r.top - c.top, r: r.right - c.left, b: r.bottom - c.top, w: r.width, h: r.height };
+      return { l: (r.left - c.left) / z, t: (r.top - c.top) / z, r: (r.right - c.left) / z, b: (r.bottom - c.top) / z, w: r.width / z, h: r.height / z };
     };
     const ri = rel($('node-input'));
     const rs = rel($('node-self'));
@@ -388,6 +392,7 @@ const UI = (() => {
       }
     }
     updateWires();
+    if (typeof Canvas !== 'undefined') Canvas.fit(true);
   }
 
   function dismissChild(card) {
@@ -395,6 +400,7 @@ const UI = (() => {
     card.remove();
     setAttached($('children').childElementCount);
     updateWires();
+    if (typeof Canvas !== 'undefined') Canvas.fit(true);
   }
 
   // Esc: cards already out stay, but any expanded one folds back to preview
@@ -407,6 +413,7 @@ const UI = (() => {
       card.querySelector('.node__more').textContent = 'See more';
     }
     updateWires();
+    if (typeof Canvas !== 'undefined') Canvas.fit(true);
   }
 
   function cancelSpawn() {
@@ -450,6 +457,7 @@ const UI = (() => {
       if (nodeObserver) nodeObserver.observe(card);
       requestAnimationFrame(() => card.classList.remove('entering'));
       updateWires(true);
+      if (typeof Canvas !== 'undefined') Canvas.fit(true); // zoom out before the column overflows
       last = card;
     }
     if (last && alive() && typeof Canvas !== 'undefined') Canvas.reveal(last);
@@ -558,7 +566,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // wires: recompute on resize, font load, video metadata (face:ready), and
   // whenever a node's box changes (panning needs no recompute — canvas space)
-  window.addEventListener('resize', () => { UI.centerGraph(); UI.updateWires(); });
+  window.addEventListener('resize', () => { UI.centerGraph(); Canvas.fit(true); UI.updateWires(); });
   document.addEventListener('face:ready', UI.updateWires);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(UI.updateWires);
   const nodeObserver = new ResizeObserver(UI.updateWires);
@@ -566,6 +574,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   UI.setNodeObserver(nodeObserver);
   Canvas.init();
   UI.centerGraph();
+  Canvas.fit(false);   // initial auto-fit (no animation on load)
   UI.updateWires();
 
   const input = document.getElementById('query');
