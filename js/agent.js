@@ -32,6 +32,7 @@ const Agent = (() => {
 
   function cancel() {
     interrupt();
+    UI.finishReveal(); // keep the last answer, fully shown
     Face.setMouth(0);
     setState('idle');
   }
@@ -68,7 +69,9 @@ const Agent = (() => {
 
       const entry = res.docId ? Memory.byId(res.docId) : null;
       setState('speaking');
-      UI.setAnswer(res, entry);
+      await UI.setAnswer(res, entry, { reveal: true });
+      UI.startReveal(res.text, res.text.length * 60); // uniform fallback pace;
+      // speech boundary events drive revealAnswer ahead of it when available
 
       // the agent "pulls the document out of its memory" shortly after it
       // starts speaking; Esc or a new query clears this timer (B3)
@@ -77,12 +80,14 @@ const Agent = (() => {
       await Promise.race([
         new Promise(resolve => Voice.speak(res.text, {
           onViseme: v => Face.setMouth(v),
+          onBoundary: ({ charIndex }) => UI.revealAnswer(charIndex),
           onEnd: resolve
         })),
         new Promise(resolve => { interruptResolve = resolve; })
       ]);
       if (myRound !== round) return; // superseded while speaking
 
+      UI.finishReveal();
       Face.setMouth(0);
       setState(res.docId ? 'showing' : 'idle');
     } finally {

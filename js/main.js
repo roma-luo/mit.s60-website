@@ -17,6 +17,9 @@ const LABELS = {
 const UI = (() => {
   const $ = id => document.getElementById(id);
   let answerCount = 0;
+  let answerEl = null;
+  let answerText = '';
+  let revealTimer = null;
 
   function metaRow(key, value) {
     const row = document.createElement('div');
@@ -99,7 +102,8 @@ const UI = (() => {
   }
 
   /* ---- OUTPUT node */
-  async function setAnswer(res, entry) {
+  async function setAnswer(res, entry, opts = {}) {
+    stopReveal();
     answerCount++;
     $('output-label').textContent = LABELS.output(answerCount);
     $('output-led').dataset.state = 'idle'; // has content: white dot
@@ -108,15 +112,37 @@ const UI = (() => {
     const body = $('output-body');
     body.classList.remove('thinking');
     body.innerHTML = '';
-    const p = document.createElement('p');
-    p.className = 'answer';
-    p.textContent = res.text || '';
-    body.appendChild(p);
+    answerEl = null;
+    answerText = res.text || '';
+
+    // §4.3 three forms: text only / image dominant (short text moves to meta)
+    // / image + text — picked from whether the doc has a first image
+    let imgUrl = null;
+    if (entry) {
+      try { imgUrl = await Memory.firstImage(entry); } catch (e) { imgUrl = null; }
+    }
+    const imgOnly = !!imgUrl && answerText.length > 0 && answerText.length < 40;
+
+    if (imgUrl) {
+      const img = document.createElement('img');
+      img.src = imgUrl;
+      img.alt = entry.title;
+      img.className = 'answer-img' + (imgOnly ? '' : ' answer-img--with-text');
+      body.appendChild(img);
+    }
+    if (!imgOnly) {
+      const p = document.createElement('p');
+      p.className = 'answer';
+      p.textContent = opts.reveal ? '' : answerText;
+      body.appendChild(p);
+      answerEl = p;
+    }
 
     const meta = $('output-meta');
     const more = $('output-more');
     meta.innerHTML = '';
     if (entry) {
+      if (imgOnly) meta.appendChild(metaRow('Note', answerText));
       meta.appendChild(metaRow('Memory', entry.title));
       meta.appendChild(metaRow('Section', entry.section));
       meta.appendChild(metaRow('Source', entry.file));
@@ -127,7 +153,42 @@ const UI = (() => {
       meta.classList.add('hidden');
       more.classList.add('hidden');
     }
+
+    // new answer enters with a 120ms opacity fade, no sliding
+    body.classList.remove('fade-in');
+    void body.offsetWidth;
+    body.classList.add('fade-in');
     updateWires();
+  }
+
+  /* ---- typewriter reveal (§4.3): speech-boundary driven (charIndex) with a
+   * uniform fallback pace; the two merge by taking the furthest position.
+   * onEnd → finishReveal shows everything. */
+  function startReveal(text, estMs) {
+    answerText = text;
+    stopReveal();
+    if (!answerEl) return;
+    const t0 = performance.now();
+    revealTimer = setInterval(() => {
+      const p = Math.min(1, (performance.now() - t0) / Math.max(1, estMs));
+      revealAnswer(Math.floor(p * answerText.length));
+      if (p >= 1) stopReveal();
+    }, 50);
+  }
+
+  function revealAnswer(n) {
+    if (!answerEl) return;
+    const next = Math.max(answerEl.textContent.length, Math.min(n, answerText.length));
+    answerEl.textContent = answerText.slice(0, next);
+  }
+
+  function finishReveal() {
+    stopReveal();
+    if (answerEl) answerEl.textContent = answerText;
+  }
+
+  function stopReveal() {
+    if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
   }
 
   /* ---- doc overlay */
@@ -219,7 +280,8 @@ const UI = (() => {
 
   return {
     setState, setMode, setLastQuery, buildSelfMeta,
-    setAnswer, openDoc, closeDoc, showIndex, hideIndex, updateWires
+    setAnswer, startReveal, revealAnswer, finishReveal,
+    openDoc, closeDoc, showIndex, hideIndex, updateWires
   };
 })();
 
