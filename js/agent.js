@@ -2,29 +2,30 @@
  * idle → listening → thinking → speaking → (showing) → idle
  *
  *   Agent.handle(query)  — a new query interrupts the current round (B4):
- *                          speech stops, the pending panel timer is cleared
+ *                          speech stops, the pending doc timer is cleared
  *                          (B3), and the new round starts immediately.
  *   Agent.cancel()       — Esc: same interrupt, then back to idle.
+ *   Agent.setState(st)   — drives Face and UI together (§6).
  * busy is reset in try/finally (B2); voice.js additionally carries a
  * watchdog for browsers that never fire SpeechSynthesis onend.
  */
 const Agent = (() => {
   let busy = false;
   let round = 0;
-  let panelTimer = null;
+  let docTimer = null;
   let interruptResolve = null;
 
   function setState(st) {
     Face.setState(st);
-    UI.setStateHint(st);
+    UI.setState(st);
   }
 
-  // Supersede whatever is happening: stop speech, cancel the pending
-  // panel (B3), and release any round still awaiting its speech end.
+  // Supersede whatever is happening: stop speech, cancel the pending doc
+  // overlay (B3), and release any round still awaiting its speech end.
   function interrupt() {
     round++;
     Voice.stop();
-    if (panelTimer) { clearTimeout(panelTimer); panelTimer = null; }
+    if (docTimer) { clearTimeout(docTimer); docTimer = null; }
     if (interruptResolve) { interruptResolve(); interruptResolve = null; }
   }
 
@@ -45,9 +46,8 @@ const Agent = (() => {
     const myRound = round;
     let res = null;
     try {
-      UI.hideInput();
-      UI.hideSubtitle();
       setState('thinking');
+      UI.setLastQuery(query);
 
       const liveBrain = DeepseekBrain.enabled ? DeepseekBrain
                       : OllamaBrain.enabled ? OllamaBrain
@@ -65,13 +65,13 @@ const Agent = (() => {
       }
       if (myRound !== round) return; // superseded while thinking
 
+      const entry = res.docId ? Memory.byId(res.docId) : null;
       setState('speaking');
-      UI.showSubtitle(res.text);
+      UI.setAnswer(res, entry);
 
-      if (res.docId) {
-        const entry = Memory.byId(res.docId);
-        if (entry) panelTimer = setTimeout(() => { panelTimer = null; Memory.showPanel(entry); }, 900);
-      }
+      // the agent "pulls the document out of its memory" shortly after it
+      // starts speaking; Esc or a new query clears this timer (B3)
+      if (entry) docTimer = setTimeout(() => { docTimer = null; UI.openDoc(entry); }, 900);
 
       await Promise.race([
         new Promise(resolve => Voice.speak(res.text, {
@@ -84,17 +84,15 @@ const Agent = (() => {
 
       Face.setMouth(0);
       setState(res.docId ? 'showing' : 'idle');
-      UI.fadeSubtitle();
-      UI.showInput();
     } finally {
       // B2: error, interrupt or missing onend — the agent never stays busy
-      // and no panel timer outlives its round.
+      // and no doc timer outlives its round.
       if (myRound === round) {
-        if (panelTimer) { clearTimeout(panelTimer); panelTimer = null; }
+        if (docTimer) { clearTimeout(docTimer); docTimer = null; }
         busy = false;
       }
     }
   }
 
-  return { handle, cancel };
+  return { handle, cancel, setState };
 })();

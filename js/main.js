@@ -1,88 +1,208 @@
-/* main — boot and UI wiring. Exposes the UI helper object used by Agent. */
+/* main — boot and UI wiring for the node-graph layout.
+ * Exposes the UI object used by Agent:
+ *   UI.setState(st)            — LED + INPUT Status meta
+ *   UI.setAnswer(res, entry)   — rebuild the OUTPUT node body
+ *   UI.setLastQuery(q)         — INPUT meta third row
+ *   UI.openDoc(entry) / UI.closeDoc()
+ *   UI.showIndex() / UI.hideIndex()
+ */
+
+const LABELS = {
+  input: 'S60-IN',
+  self: 'S60-SELF',
+  output: n => 'S60-OUT-' + String(n).padStart(2, '0'),
+  mem: id => 'S60-MEM-' + String(id).toUpperCase()
+};
 
 const UI = (() => {
   const $ = id => document.getElementById(id);
-  let subtitleTimer = null;
+  let answerCount = 0;
 
-  function showInput() {
-    $('input-bar').classList.remove('hidden');
-    requestAnimationFrame(() => $('input-bar').classList.add('visible'));
-    $('query').focus();
-  }
-  function hideInput() {
-    $('input-bar').classList.remove('visible');
-  }
-  function showSubtitle(text) {
-    const el = $('subtitle');
-    el.textContent = text;
-    el.classList.add('visible');
-    if (subtitleTimer) clearTimeout(subtitleTimer);
-  }
-  function fadeSubtitle() {
-    if (subtitleTimer) clearTimeout(subtitleTimer);
-    subtitleTimer = setTimeout(hideSubtitle, 3500);
-  }
-  function hideSubtitle() {
-    $('subtitle').classList.remove('visible');
+  function metaRow(key, value) {
+    const row = document.createElement('div');
+    row.className = 'meta-row';
+    const k = document.createElement('span');
+    k.textContent = key + ':';
+    const v = document.createElement('b');
+    v.textContent = value;
+    row.appendChild(k);
+    row.appendChild(v);
+    return row;
   }
 
+  /* URL of a memory document itself — used as Markdown baseUrl so relative
+   * images/links inside the doc resolve correctly from any subpath. */
+  function docBaseUrl(entry) {
+    return new URL(entry.file, document.baseURI).href;
+  }
+
+  /* ---- state → UI (§6); wires join in a later step */
+  function setState(st) {
+    $('self-led').dataset.state = st === 'showing' ? 'idle' : st;
+    $('input-status').textContent = st === 'showing' ? 'idle' : st;
+  }
+
+  function setMode(mode) {
+    $('input-mode').textContent = mode;
+  }
+
+  function setLastQuery(q) {
+    const meta = $('input-meta');
+    let row = $('input-last-row');
+    if (!row) {
+      row = metaRow('Last', '');
+      row.id = 'input-last-row';
+      meta.appendChild(row);
+    }
+    row.querySelector('b').textContent = q.length > 60 ? q.slice(0, 60) + '…' : q;
+  }
+
+  function buildSelfMeta() {
+    const p = Memory.persona;
+    const client = (p.course || '').split(/[,(]/)[0].trim().replace(/\s+at\s+the\s+/i, ' · ')
+      || 'MAS.S60 · MIT Media Lab';
+    let maxWeek = 0;
+    for (const e of Memory.entries) {
+      const m = (e.section || '').match(/week\s*(\d+)/i);
+      if (m) maxWeek = Math.max(maxWeek, +m[1]);
+    }
+    const meta = $('self-meta');
+    meta.appendChild(metaRow('Project', 'Digital Self'));
+    meta.appendChild(metaRow('Client', client));
+    meta.appendChild(metaRow('Design phase', maxWeek ? 'Week ' + maxWeek : '—'));
+    meta.appendChild(metaRow('Image type', Face === FaceVideo ? 'Video loop' : 'Procedural canvas'));
+  }
+
+  /* ---- OUTPUT node */
+  async function setAnswer(res, entry) {
+    answerCount++;
+    $('output-label').textContent = LABELS.output(answerCount);
+    $('output-led').dataset.state = 'idle'; // has content: white dot
+    $('node-output').dataset.label = LABELS.output(answerCount);
+
+    const body = $('output-body');
+    body.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'answer';
+    p.textContent = res.text || '';
+    body.appendChild(p);
+
+    const meta = $('output-meta');
+    const more = $('output-more');
+    meta.innerHTML = '';
+    if (entry) {
+      meta.appendChild(metaRow('Memory', entry.title));
+      meta.appendChild(metaRow('Section', entry.section));
+      meta.appendChild(metaRow('Source', entry.file));
+      meta.classList.remove('hidden');
+      more.classList.remove('hidden');
+      more.onclick = ev => { ev.preventDefault(); openDoc(entry); };
+    } else {
+      meta.classList.add('hidden');
+      more.classList.add('hidden');
+    }
+  }
+
+  /* ---- doc overlay */
+  async function openDoc(entry) {
+    $('doc-label').textContent = LABELS.mem(entry.id);
+    const body = $('doc-body');
+    body.innerHTML = '<p>recalling…</p>';
+    const meta = $('doc-meta');
+    meta.innerHTML = '';
+    meta.appendChild(metaRow('Memory', entry.title));
+    meta.appendChild(metaRow('Section', entry.section));
+    meta.appendChild(metaRow('Source', entry.file));
+    $('doc-mask').classList.remove('hidden');
+    $('doc-overlay').classList.remove('hidden');
+    try {
+      const md = await Memory.fetchDoc(entry);
+      body.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
+      body.scrollTop = 0;
+    } catch (err) {
+      body.innerHTML = '<p>(this memory could not be loaded)</p>';
+    }
+  }
+
+  function closeDoc() {
+    $('doc-overlay').classList.add('hidden');
+    $('doc-mask').classList.add('hidden');
+  }
+
+  /* ---- index overlay */
   function showIndex() {
     buildIndex();
     $('index-overlay').classList.remove('hidden');
-    Voice.stop();
-    Face.setMouth(0);
-    Face.setState('idle');
   }
+
   function hideIndex() {
     $('index-overlay').classList.add('hidden');
   }
 
   function buildIndex() {
-    const list = $('index-list');
-    list.innerHTML = '';
-    let lastSection = null;
+    $('index-title').textContent = 'INDEX · ' + Memory.entries.length + ' memories';
+    const grid = $('index-grid');
+    grid.innerHTML = '';
     for (const e of Memory.entries) {
-      if (e.section !== lastSection) {
-        lastSection = e.section;
-        const label = document.createElement('div');
-        label.className = 'section-label';
-        label.textContent = lastSection;
-        list.appendChild(label);
-      }
-      const a = document.createElement('a');
-      a.href = '#';
-      a.textContent = e.title;
-      a.onclick = ev => {
+      const card = document.createElement('section');
+      card.className = 'node index-card';
+
+      const head = document.createElement('header');
+      head.className = 'node__head';
+      const label = document.createElement('span');
+      label.className = 'node__label';
+      label.textContent = LABELS.mem(e.id);
+      head.appendChild(label);
+
+      const body = document.createElement('div');
+      body.className = 'node__body';
+      body.textContent = e.section; // image thumbnails join in a later step
+
+      const meta = document.createElement('footer');
+      meta.className = 'node__meta';
+      meta.appendChild(metaRow('Title', e.title));
+      meta.appendChild(metaRow('Section', e.section));
+
+      const more = document.createElement('a');
+      more.className = 'node__more';
+      more.href = '#';
+      more.textContent = 'See more';
+
+      card.appendChild(head);
+      card.appendChild(body);
+      card.appendChild(meta);
+      card.appendChild(more);
+      card.addEventListener('click', ev => {
         ev.preventDefault();
         hideIndex();
-        Memory.showPanel(e);
-        Face.setState('showing');
-      };
-      list.appendChild(a);
+        openDoc(e); // OUTPUT-sync (Agent.showEntry) joins in a later step
+      });
+      grid.appendChild(card);
     }
   }
 
-  function setStateHint() { /* reserved: subtle UI cue per agent state */ }
-
-  return { showInput, hideInput, showSubtitle, fadeSubtitle, hideSubtitle, showIndex, hideIndex, setStateHint };
+  return {
+    setState, setMode, setLastQuery, buildSelfMeta,
+    setAnswer, openDoc, closeDoc, showIndex, hideIndex
+  };
 })();
 
 window.addEventListener('DOMContentLoaded', async () => {
+  const portrait = document.getElementById('portrait');
   if (typeof FaceVideo !== 'undefined' && await FaceVideo.available()) {
     Face = FaceVideo; // swap point: video loops replace the procedural face
     console.info('face renderer: video loops');
   } else {
     console.info('face renderer: procedural canvas (video clips not found)');
   }
-  Face.init(document.getElementById('face'));
+  Face.init(portrait);
 
+  const outputBody = document.getElementById('output-body');
   try {
     await Memory.load();
   } catch (err) {
     console.error(err);
-    document.getElementById('subtitle').textContent =
-      'my memory failed to load — serve this folder over http (see README)';
-    document.getElementById('subtitle').classList.add('visible');
+    outputBody.innerHTML = '<p class="placeholder">my memory failed to load — serve this folder over http (see README)</p>';
     return;
   }
 
@@ -94,31 +214,34 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   if (DeepseekBrain.enabled) console.info('live brain mode: deepseek (cloud)');
 
+  UI.setMode(DeepseekBrain.enabled ? 'live·deepseek'
+           : OllamaBrain.enabled ? 'live·ollama'
+           : 'static');
+  UI.buildSelfMeta();
+
   const input = document.getElementById('query');
 
-  // first keypress or click on the face reveals the input bar
-  window.addEventListener('keydown', ev => {
-    if (ev.key === 'Escape') {
-      UI.hideIndex();
-      Memory.hidePanel();
-      Agent.cancel();
-      return;
-    }
-    if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey) {
-      UI.showInput();
-    }
-  });
-  // click anywhere except interactive UI reveals/focuses the input bar
-  window.addEventListener('click', ev => {
-    if (ev.target.closest('#input-bar, #memory-panel, #index-overlay, #index-dot')) return;
-    UI.showInput();
-  });
-
   input.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
       const q = input.value;
       input.value = '';
       Agent.handle(q);
+    }
+  });
+
+  // global keys: Esc closes overlays & stops speech; "/" focuses the input
+  window.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape') {
+      UI.closeDoc();
+      UI.hideIndex();
+      Agent.cancel();
+      return;
+    }
+    if (ev.key === '/' && !ev.metaKey && !ev.ctrlKey &&
+        !/^(TEXTAREA|INPUT)$/.test(ev.target.tagName)) {
+      ev.preventDefault();
+      input.focus();
     }
   });
 
@@ -128,12 +251,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   } else {
     micBtn.addEventListener('click', () => {
       micBtn.classList.add('listening');
-      Face.setState('listening');
+      Agent.setState('listening');
       Voice.listen({
         onResult: text => { input.value = text; },
         onEnd: () => {
           micBtn.classList.remove('listening');
-          Face.setState('idle');
+          Agent.setState('idle');
           if (input.value.trim()) {
             const q = input.value;
             input.value = '';
@@ -144,10 +267,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  document.getElementById('index-dot').addEventListener('click', () => UI.showIndex());
-  document.getElementById('index-overlay').addEventListener('click', () => UI.hideIndex());
-  document.getElementById('memory-close').addEventListener('click', () => {
-    Memory.hidePanel();
-    Face.setState('idle');
+  document.getElementById('index-dot').addEventListener('click', () => {
+    Agent.cancel();
+    UI.showIndex();
   });
+  document.getElementById('index-overlay').addEventListener('click', ev => {
+    if (!ev.target.closest('.node')) UI.hideIndex();
+  });
+  document.getElementById('doc-close').addEventListener('click', () => UI.closeDoc());
+  document.getElementById('doc-mask').addEventListener('click', () => UI.closeDoc());
 });

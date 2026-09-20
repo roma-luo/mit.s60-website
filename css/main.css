@@ -1,223 +1,249 @@
-/* MAS S60 — Digital Self. White, minimal: the chrome head stands on the
- * bottom edge of the screen; page background matches the clip's pure white. */
+/* MAS S60 — Digital Self · node-graph edition.
+ * Near-black dot-grid background; three node cards (INPUT / SELF / OUTPUT)
+ * joined by bezier wires. Palette: black / white / grey + four LED colors. */
+
+:root {
+  /* background: near-black + dot grid */
+  --bg: #0b0b0b;
+  --grid-dot: rgba(255,255,255,0.14);
+  --grid-size: 96px;
+
+  /* cards: dark grey body, lighter title bar, thin bright edge */
+  --card-bg: #2b2b2b;
+  --card-head: #5a5a5a;
+  --card-border: rgba(255,255,255,0.55);
+  --card-radius: 4px;
+  --card-shadow: 0 0 0 1px rgba(0,0,0,0.6), 0 24px 60px rgba(0,0,0,0.55);
+  --card-dim: 0.28;           /* opacity of dimmed / unfocused cards */
+
+  /* text */
+  --fg: #ffffff;
+  --fg-2: rgba(255,255,255,0.72);   /* metadata labels */
+  --fg-3: rgba(255,255,255,0.45);   /* hints, placeholders */
+  --font: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --fs-head: 14px;   /* title bar */
+  --fs-body: 13px;   /* metadata rows */
+  --fs-text: 15px;   /* answer body */
+
+  /* status LEDs (title-bar dots) */
+  --led-idle: #d9d9d9;
+  --led-listening: #ff4d4d;
+  --led-thinking: #ffb020;
+  --led-speaking: #37d67a;
+
+  /* wires */
+  --wire: rgba(255,255,255,0.9);
+  --wire-w: 1.25px;
+  --wire-dot: 3px;
+}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #ffffff;
-  color: #2a3a47;
-  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+html, body { width: 100%; min-height: 100%; }
+
+body {
+  background: var(--bg) radial-gradient(circle, var(--grid-dot) 1px, transparent 1.2px) 0 0 / var(--grid-size) var(--grid-size);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: var(--fs-text);
 }
 
-#face {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+.hidden { display: none !important; }
 
-/* video face layers (FaceVideo), crossfaded by toggling .front.
- * Full height, bottom flush with the viewport bottom, centered. */
-.face-video {
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  height: 100vh;
-  transform: translateX(-50%);
-  opacity: 0;
-  transition: opacity 0.45s ease;
-  pointer-events: none;
-}
-.face-video.front { opacity: 1; }
-
-/* subtitle: only visible while the agent speaks, then fades */
-#subtitle {
-  position: fixed;
-  bottom: 12vh;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 60ch;
-  text-align: center;
-  font-size: 18px;
-  line-height: 1.5;
-  color: #54687a;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.9);
-}
-#subtitle.visible { opacity: 1; }
-
-/* input bar: hidden until a key is pressed or the face is clicked */
-#input-bar {
-  position: fixed;
-  bottom: 5vh;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
+/* ---- the graph: three columns, SELF (tallest) sets the row height */
+#graph {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  gap: clamp(48px, 6vw, 120px);
   align-items: center;
-  gap: 10px;
-  opacity: 0;
-  transition: opacity 0.4s ease;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 5vh 4vw;
 }
-#input-bar.visible { opacity: 1; }
-#input-bar.hidden { display: none; }
 
-#query {
-  width: min(520px, 70vw);
-  padding: 10px 16px;
-  font-size: 16px;
-  color: #1a2733;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #b8c8d4;
-  border-radius: 22px;
-  outline: none;
-  box-shadow: 0 2px 14px rgba(42, 58, 71, 0.08);
-}
-#query:focus { border-color: #0891b2; }
-
-#mic-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 1px solid #b8c8d4;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0891b2;
-  font-size: 14px;
-  cursor: pointer;
-}
-#mic-btn.listening { color: #ef5350; border-color: #ef5350; }
-
-/* memory panel: documents the agent "pulls out" of its memory */
-#memory-panel {
-  position: fixed;
-  top: 6vh;
-  right: 4vw;
-  bottom: 6vh;
-  width: min(560px, 44vw);
-  background: rgba(12, 18, 24, 0.94);
-  border: 1px solid #27404f;
-  border-radius: 10px;
-  box-shadow: 0 0 40px rgba(9, 30, 45, 0.25);
+/* ---- node skeleton (three nodes, doc overlay, index cards all reuse it) */
+.node {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  color: var(--fg);
+  font-family: var(--font);
   display: flex;
   flex-direction: column;
-  transform: translateX(0);
-  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.5s ease;
-  z-index: 10;
+  overflow: hidden;
 }
-#memory-panel.hidden {
-  transform: translateX(60vw);
-  opacity: 0;
-  pointer-events: none;
-}
+.node:focus-within { border-color: #ffffff; }
 
-#memory-panel-header {
+.node__head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 18px;
-  border-bottom: 1px solid #1d2c38;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--card-head);
+  font-size: var(--fs-head);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.node__led {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--led-idle);
+  transition: background .2s;
+}
+.node__led[data-state="empty"] { background: var(--fg-3); }
+
+.node__body { padding: 12px; flex: 1; min-height: 0; }
+.node__meta { padding: 8px 12px 4px; font-size: var(--fs-body); line-height: 1.6; }
+.meta-row span { color: var(--fg-2); margin-right: .4em; }
+.meta-row b { font-weight: 700; color: var(--fg); }
+.node__more {
+  display: block;
+  padding: 10px 12px 14px;
+  font-size: var(--fs-body);
+  color: var(--fg);
+  text-decoration: none;
+  opacity: .9;
+}
+.node__more:hover { text-decoration: underline; }
+
+/* close control for overlay nodes: 9px dot, × on hover */
+.node__close { position: relative; width: 16px; height: 16px; background: none; border: none; cursor: pointer; }
+.node__close::before {
+  content: '';
+  position: absolute;
+  inset: 3.5px;
+  border-radius: 50%;
+  background: var(--fg-3);
+}
+.node__close:hover::before { background: transparent; }
+.node__close:hover::after {
+  content: '×';
+  position: absolute;
+  inset: 0;
+  color: var(--fg);
   font-size: 14px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #4fc3f7;
+  line-height: 16px;
+  text-align: center;
 }
 
-#memory-close {
+/* ---- INPUT (left) */
+#node-input { width: clamp(240px, 22vw, 320px); }
+#query {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: var(--fs-text);
+  line-height: 1.5;
+  resize: none;
+}
+#query::placeholder { color: var(--fg-3); }
+.input-tools { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+#mic-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: none;
   border: none;
-  color: #9fb3c8;
-  font-size: 22px;
+  color: var(--fg-2);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.12em;
   cursor: pointer;
 }
+#mic-btn .mic-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg-3); }
+#mic-btn.listening .mic-dot { background: var(--led-listening); }
+.hint { color: var(--fg-3); font-size: 11px; }
 
-#memory-content {
-  padding: 18px 22px;
-  overflow-y: auto;
-  font-size: 15px;
-  line-height: 1.65;
-  color: #cfd8dc;
+/* ---- SELF (center, portrait window) */
+.portrait {
+  position: relative;
+  aspect-ratio: 848 / 1280;
+  height: min(64vh, 720px);
+  margin: 0 auto;
+  background: #ffffff;   /* the clips are white-background: a photo in the card */
+  overflow: hidden;
 }
-#memory-content h1, #memory-content h2, #memory-content h3 {
-  color: #dfe9f0;
-  margin: 0.9em 0 0.4em;
+.portrait canvas,
+.portrait .face-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 0;   /* top-aligned: the top of the head is never cut */
 }
-#memory-content h1 { font-size: 22px; }
-#memory-content h2 { font-size: 18px; }
-#memory-content h3 { font-size: 16px; }
-#memory-content p { margin: 0.6em 0; }
-#memory-content ul, #memory-content ol { margin: 0.6em 0 0.6em 1.4em; }
-#memory-content a { color: #4fc3f7; }
-#memory-content code {
-  background: #141c24;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-}
-#memory-content pre {
-  background: #141c24;
-  padding: 12px;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 0.8em 0;
-}
-#memory-content pre code { padding: 0; background: none; }
-#memory-content img { max-width: 100%; border-radius: 6px; }
-#memory-content hr { border: none; border-top: 1px solid #1d2c38; margin: 1.2em 0; }
+.portrait .face-video { opacity: 0; transition: opacity .35s ease; pointer-events: none; }
+.portrait .face-video.front { opacity: 1; }
 
-/* grader fallback: plain index overlay */
+/* ---- OUTPUT (right) */
+#node-output { width: clamp(280px, 26vw, 400px); }
+#output-body .placeholder { color: var(--fg-3); }
+
+/* ---- doc overlay (See more → full memory document) */
+#doc-mask { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 29; }
+#doc-overlay { position: fixed; inset: 6vh 10vw; z-index: 30; }
+.doc-body { overflow-y: auto; font-size: 15px; line-height: 1.65; }
+.doc-body h1, .doc-body h2, .doc-body h3, .doc-body h4, .doc-body h5, .doc-body h6 { margin: 0.9em 0 0.4em; line-height: 1.3; }
+.doc-body h1 { font-size: 22px; }
+.doc-body h2 { font-size: 18px; }
+.doc-body h3 { font-size: 16px; }
+.doc-body p { margin: 0.6em 0; }
+.doc-body ul, .doc-body ol { margin: 0.6em 0 0.6em 1.4em; }
+.doc-body a { color: var(--fg); }
+.doc-body code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+.doc-body pre { background: rgba(255,255,255,0.06); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0.8em 0; }
+.doc-body pre code { padding: 0; background: none; }
+.doc-body img { max-width: 100%; }
+.doc-body hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 1.2em 0; }
+.doc-body table { border-collapse: collapse; margin: 0.8em 0; }
+.doc-body th, .doc-body td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,.15); text-align: left; }
+.doc-body blockquote { border-left: 2px solid #ffffff; padding-left: 12px; margin: 0.6em 0; color: var(--fg-2); }
+
+/* ---- index overlay (all memories as node cards) */
 #index-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 7, 10, 0.96);
+  z-index: 25;
+  overflow-y: auto;
+  padding: 6vh 6vw;
+  background: var(--bg) radial-gradient(circle, var(--grid-dot) 1px, transparent 1.2px) 0 0 / var(--grid-size) var(--grid-size);
+}
+#index-title { color: var(--fg-2); font-size: 13px; letter-spacing: 0.08em; margin-bottom: 24px; }
+#index-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 24px; }
+.index-card { cursor: pointer; }
+.index-card .node__body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 20;
-}
-#index-overlay.hidden { display: none; }
-#index-inner { max-width: 640px; width: 90%; }
-#index-inner h1 {
-  font-size: 28px;
-  color: #4fc3f7;
+  min-height: 72px;
+  color: var(--fg-3);
+  text-transform: uppercase;
   letter-spacing: 0.15em;
-  text-transform: uppercase;
-  margin-bottom: 24px;
-}
-#index-list a {
-  display: block;
-  padding: 12px 4px;
-  color: #dfe9f0;
-  text-decoration: none;
-  border-bottom: 1px solid #1d2c38;
-  font-size: 17px;
-}
-#index-list a:hover { color: #4fc3f7; }
-#index-list .section-label {
-  margin-top: 22px;
   font-size: 12px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #607d8b;
+  text-align: center;
 }
-.index-hint { margin-top: 28px; font-size: 12px; color: #546e7a; }
 
-/* tiny dot bottom-right: the only permanent UI element */
+/* ---- the only permanent misc UI: 8px dot, bottom-right */
 #index-dot {
   position: fixed;
   right: 18px;
   bottom: 18px;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   border: none;
-  background: #94a9bb;
+  background: var(--fg-3);
   cursor: pointer;
-  opacity: 0.7;
   z-index: 15;
 }
-#index-dot:hover { background: #0891b2; opacity: 1; }
+#index-dot:hover { background: #ffffff; }

@@ -2,34 +2,79 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Roma Luo — Digital Self · MAS S60</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-  <canvas id="face"></canvas>
+  <svg id="wires" aria-hidden="true">
+    <path id="wire-in" class="wire" d=""/>
+    <path id="wire-out" class="wire" d=""/>
+    <circle id="wire-in-a" class="wire-dot" r="3"/>
+    <circle id="wire-in-b" class="wire-dot" r="3"/>
+    <circle id="wire-out-a" class="wire-dot" r="3"/>
+    <circle id="wire-out-b" class="wire-dot" r="3"/>
+  </svg>
 
-  <div id="subtitle"></div>
+  <main id="graph">
+    <section class="node" id="node-input" data-label="S60-IN">
+      <header class="node__head">
+        <span class="node__label">S60-IN</span>
+        <span class="node__led" data-state="idle"></span>
+      </header>
+      <div class="node__body">
+        <textarea id="query" rows="4" placeholder="ask me anything…"></textarea>
+        <div class="input-tools">
+          <button id="mic-btn" title="speak"><span class="mic-dot"></span>REC</button>
+          <span class="hint">↵ send · ⇧↵ newline · / focus</span>
+        </div>
+      </div>
+      <footer class="node__meta" id="input-meta">
+        <div class="meta-row"><span>Mode:</span><b id="input-mode">static</b></div>
+        <div class="meta-row"><span>Status:</span><b id="input-status">idle</b></div>
+      </footer>
+    </section>
 
-  <div id="memory-panel" class="hidden">
-    <div id="memory-panel-header">
-      <span id="memory-title"></span>
-      <button id="memory-close" aria-label="close">&times;</button>
-    </div>
-    <div id="memory-content"></div>
-  </div>
+    <section class="node" id="node-self" data-label="S60-SELF">
+      <header class="node__head">
+        <span class="node__label">S60-SELF</span>
+        <span class="node__led" id="self-led" data-state="idle"></span>
+      </header>
+      <div class="node__body">
+        <div class="portrait" id="portrait"></div>
+      </div>
+      <footer class="node__meta" id="self-meta"></footer>
+    </section>
 
-  <div id="input-bar" class="hidden">
-    <button id="mic-btn" title="hold to speak">&#9679;</button>
-    <input id="query" type="text" placeholder="ask me anything..." autocomplete="off">
+    <section class="node" id="node-output" data-label="S60-OUT-01">
+      <header class="node__head">
+        <span class="node__label" id="output-label">S60-OUT-01</span>
+        <span class="node__led" id="output-led" data-state="empty"></span>
+      </header>
+      <div class="node__body" id="output-body">
+        <p class="placeholder">waiting for input</p>
+      </div>
+      <footer class="node__meta hidden" id="output-meta"></footer>
+      <a class="node__more hidden" id="output-more" href="#">See more</a>
+    </section>
+  </main>
+
+  <div id="doc-mask" class="hidden"></div>
+  <div id="doc-overlay" class="node node--wide hidden">
+    <header class="node__head">
+      <span class="node__label" id="doc-label">S60-MEM</span>
+      <button class="node__close" id="doc-close" aria-label="close"></button>
+    </header>
+    <div class="node__body doc-body" id="doc-body"></div>
+    <footer class="node__meta" id="doc-meta"></footer>
   </div>
 
   <div id="index-overlay" class="hidden">
-    <div id="index-inner">
-      <h1>Index</h1>
-      <div id="index-list"></div>
-      <p class="index-hint">press Esc or click anywhere to return</p>
-    </div>
+    <p id="index-title">INDEX</p>
+    <div id="index-grid"></div>
   </div>
 
   <button id="index-dot" title="index"></button>

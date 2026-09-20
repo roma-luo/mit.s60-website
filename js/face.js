@@ -32,7 +32,13 @@ var Face = (() => {
   };
 
   function init(el) {
-    canvas = el;
+    // accepts a canvas or a container (.portrait): create the canvas on demand
+    if (el && el.tagName !== 'CANVAS') {
+      canvas = document.createElement('canvas');
+      el.appendChild(canvas);
+    } else {
+      canvas = el;
+    }
     ctx = canvas.getContext('2d');
     resize();
     window.addEventListener('resize', resize);
@@ -41,8 +47,9 @@ var Face = (() => {
 
   function resize() {
     const dpr = window.devicePixelRatio || 1;
-    W = window.innerWidth;
-    H = window.innerHeight;
+    const host = canvas.parentElement;
+    W = host ? host.clientWidth : window.innerWidth;
+    H = host ? host.clientHeight : window.innerHeight;
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

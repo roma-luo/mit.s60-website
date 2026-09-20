@@ -3,7 +3,8 @@
  * main.js picks FaceVideo when the clips exist, Face otherwise.
  *
  *   await FaceVideo.available()  — true if assets/idle.mp4 & assets/talking.mp4 exist
- *   FaceVideo.init(canvasEl)     — hides the canvas, mounts two video layers
+ *   FaceVideo.init(container)    — mounts the two video layers into the
+ *                                  .portrait element of the SELF node
  *   FaceVideo.setState(mode)     — 'speaking' shows the talking loop, else idle
  *   FaceVideo.setMouth(v) / FaceVideo.lookAt(x, y) — no-ops (API parity)
  */
@@ -21,7 +22,7 @@ const FaceVideo = (() => {
     } catch (e) { return false; }
   }
 
-  function makeLayer(src) {
+  function makeLayer(src, container) {
     const v = document.createElement('video');
     v.src = src;
     v.muted = true;       // voice comes from SpeechSynthesis, clips are silent
@@ -30,15 +31,14 @@ const FaceVideo = (() => {
     v.playsInline = true;
     v.preload = 'auto';
     v.className = 'face-video';
-    document.body.appendChild(v);
+    container.appendChild(v);
     v.play().catch(() => {});
     return v;
   }
 
-  function init(canvasEl) {
-    if (canvasEl) canvasEl.style.display = 'none';
-    layers.idle = makeLayer(IDLE);
-    layers.talking = makeLayer(TALKING);
+  function init(container) {
+    layers.idle = makeLayer(IDLE, container);
+    layers.talking = makeLayer(TALKING, container);
     show('idle');
   }
 

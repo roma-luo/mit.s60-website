@@ -1,11 +1,10 @@
 /* Memory — the agent's memory vault: manifest registry + document fetch
- * + keyword search + the "pull out" panel.
+ * + keyword search. Display is owned by UI (main.js).
  *
  *   await Memory.load()          — fetch content/manifest.json
  *   Memory.search(query)         — scored entries, best first: [{entry, score}]
  *   Memory.byId(id)
  *   await Memory.fetchDoc(entry) — markdown source (cached)
- *   Memory.showPanel(entry) / Memory.hidePanel()
  */
 const Memory = (() => {
   let entries = [];
@@ -66,26 +65,8 @@ const Memory = (() => {
     return scored.sort((a, b) => b.score - a.score);
   }
 
-  function showPanel(entry) {
-    const panel = document.getElementById('memory-panel');
-    document.getElementById('memory-title').textContent = entry.title;
-    const content = document.getElementById('memory-content');
-    content.innerHTML = '<p>recalling…</p>';
-    panel.classList.remove('hidden');
-    fetchDoc(entry).then(md => {
-      content.innerHTML = Markdown.render(md);
-      content.scrollTop = 0;
-    }).catch(() => {
-      content.innerHTML = '<p>(this memory could not be loaded)</p>';
-    });
-  }
-
-  function hidePanel() {
-    document.getElementById('memory-panel').classList.add('hidden');
-  }
-
   return {
-    load, search, byId, fetchDoc, showPanel, hidePanel,
+    load, search, byId, fetchDoc,
     get entries() { return entries; },
     get persona() { return persona; }
   };
