@@ -67,7 +67,10 @@ const Agent = (() => {
       }
       if (myRound !== round) return; // superseded while thinking
 
-      const entry = res.docId ? Memory.byId(res.docId) : null;
+      // brains now return docIds[]; until child nodes land (next step) only
+      // the first document takes the old overlay path — behavior unchanged
+      const entries = (res.docIds || []).map(Memory.byId).filter(Boolean);
+      const entry = entries[0] || null;
       setState('speaking');
       await UI.setAnswer(res, entry, { reveal: true });
       UI.startReveal(res.text, res.text.length * 60); // uniform fallback pace;
@@ -89,7 +92,7 @@ const Agent = (() => {
 
       UI.finishReveal();
       Face.setMouth(0);
-      setState(res.docId ? 'showing' : 'idle');
+      setState(entries.length ? 'showing' : 'idle');
     } finally {
       // B2: error, interrupt or missing onend — the agent never stays busy
       // and no doc timer outlives its round.

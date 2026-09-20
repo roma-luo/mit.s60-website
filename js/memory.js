@@ -4,6 +4,7 @@
  *   await Memory.load()          — fetch content/manifest.json
  *   Memory.search(query)         — scored entries, best first: [{entry, score}]
  *   Memory.byId(id)
+ *   Memory.label(entry)        — display label ("WEEK 01"), entry.label or derived
  *   await Memory.fetchDoc(entry) — markdown source (cached)
  *   await Memory.firstImage(entry) — first ![..](src) of the doc, resolved
  *                                    against the doc's own URL (or null)
@@ -24,6 +25,15 @@ const Memory = (() => {
 
   function byId(id) {
     return entries.find(e => e.id === id) || null;
+  }
+
+  // display label for child-node titles: entry.label when present, else the
+  // title part before "—", uppercased, trailing number zero-padded ("Week 1"
+  // → "WEEK 01") — new memories work without an explicit label
+  function label(entry) {
+    if (entry.label) return entry.label;
+    const base = (entry.title.split('—')[0] || entry.title).trim().toUpperCase();
+    return base.replace(/(\d+)\s*$/, m => m.padStart(2, '0'));
   }
 
   async function fetchDoc(entry) {
@@ -79,7 +89,7 @@ const Memory = (() => {
   }
 
   return {
-    load, search, byId, fetchDoc, firstImage,
+    load, search, byId, fetchDoc, firstImage, label,
     get entries() { return entries; },
     get persona() { return persona; }
   };

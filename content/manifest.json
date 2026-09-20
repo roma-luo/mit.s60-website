@@ -9,6 +9,7 @@
   "entries": [
     {
       "id": "self",
+      "label": "SELF",
       "title": "Who I am — Roma Luo",
       "section": "meta",
       "tags": ["roma", "luo", "name", "identity", "harvard", "gsd", "mit", "media", "lab", "student", "who"],
@@ -18,6 +19,7 @@
     },
     {
       "id": "about",
+      "label": "ABOUT",
       "title": "About — what this site is",
       "section": "meta",
       "tags": ["about", "site", "concept", "digital", "self", "how"],
@@ -27,6 +29,7 @@
     },
     {
       "id": "week1",
+      "label": "WEEK 01",
       "title": "Week 1 — Minimal agent loop, website, project ideas",
       "section": "week 1",
       "tags": ["week1", "agent", "loop", "website", "documentation"],
@@ -36,6 +39,7 @@
     },
     {
       "id": "fp-1",
+      "label": "FINAL IDEA 01",
       "title": "Final project idea 1 — TBD",
       "section": "final project",
       "tags": ["final", "project", "idea", "proposal"],
@@ -45,6 +49,7 @@
     },
     {
       "id": "fp-2",
+      "label": "FINAL IDEA 02",
       "title": "Final project idea 2 — TBD",
       "section": "final project",
       "tags": ["final", "project", "idea", "proposal"],
@@ -54,6 +59,7 @@
     },
     {
       "id": "fp-3",
+      "label": "FINAL IDEA 03",
       "title": "Final project idea 3 — TBD",
       "section": "final project",
       "tags": ["final", "project", "idea", "proposal"],
