@@ -26,11 +26,12 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${key}`
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: 'deepseek-v4-flash',
         messages,
         temperature: 0.7,
         max_tokens: 400,
-        stream: false
+        stream: false,
+        thinking: { type: 'disabled' }   // v4-flash defaults to thinking on; we want plain fast replies
       })
     });
     const data = await upstream.json();
