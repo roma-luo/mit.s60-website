@@ -7,7 +7,12 @@
  *   await DeepseekBrain.answer(query) → { text, docId? }
  */
 const DeepseekBrain = (() => {
-  const enabled = /(?:\?|&)brain=deepseek\b/.test(location.search);
+  // B13: on a production hostname (not localhost/127.0.0.1) with no explicit
+  // ?brain= param, default to deepseek — locally the static brain stays default
+  const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  const hasBrainParam = /(?:\?|&)brain=/.test(location.search);
+  const enabled = /(?:\?|&)brain=deepseek\b/.test(location.search)
+               || (!isLocal && !hasBrainParam);
 
   async function chat(messages) {
     const res = await fetch('/api/chat', {

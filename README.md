@@ -17,14 +17,22 @@ python -m http.server 8000
 
 ## Use it
 
-- The screen shows only the face. Press any key (or click the face) to reveal
-  the input bar; type a question, hit Enter.
-- Ask: *"what did you do in week 1"*, *"final project ideas"*, *"who are you"*.
-- The agent answers aloud and **pulls the matching document out of its memory**
-  (panel on the right).
-- `/index` or the tiny dot at bottom-right opens a plain index of all content
-  (grader fallback). `Esc` closes panels and stops speech.
+- The screen is a small node graph: **INPUT** (left), **SELF** (the portrait
+  window, center — its title-bar dot is the status LED), **OUTPUT** (right),
+  connected by bezier wires. The input box is always on screen, always ready.
+- Type a question, `Enter` to send (`Shift+Enter` = newline, `/` focuses the
+  box). Ask: *"what did you do in week 1"*, *"final project ideas"*, *"who are you"*.
+- The agent answers aloud while the answer types out in OUTPUT, in sync with
+  the voice; it also **pulls the matching document out of its memory**
+  (auto-opens, or `See more` under the answer).
+- `/index` or the tiny dot at bottom-right opens a card grid of every memory;
+  click a card to load it into OUTPUT + the document overlay (no speech).
+  `Esc` closes overlays and stops speech.
 - Mic button = speech input (Chrome only).
+- Online (the Vercel deployment) the default brain is **DeepSeek** (live mode);
+  locally it stays the static brain unless you append `?brain=ollama` or
+  `?brain=deepseek`. If the live brain fails, it silently falls back to the
+  static one.
 
 ## Live brain mode (local LLM agent loop)
 
@@ -78,16 +86,20 @@ Push this folder to the private course GitHub repo, then either:
 ## Structure
 
 ```
-index.html          single page: canvas face + memory panel + input bar
-css/main.css        dark minimal theme
-js/face.js          procedural face renderer (swap point for 3D/video later)
-js/voice.js         TTS mouth-driving + optional STT
+index.html          single page: three node cards (INPUT / SELF / OUTPUT) + wires svg
+css/main.css        node-graph theme: design tokens, cards, wires, overlays
+js/face.js          procedural face renderer (fallback when video clips are missing)
+js/facevideo.js     video face renderer (assets/idle.mp4 + assets/talking.mp4 loops)
+js/voice.js         TTS mouth-driving + chunked speech + optional STT
 js/brain.js         static intent/retrieval brain
 js/rag.js           vector memory: embeddings + cosine search (live mode)
-js/ollama.js        live mode: hand-written agent loop (recall/show tools)
-js/memory.js        manifest loader, search, pull-out panel
-js/markdown.js      minimal md→html, zero dependencies
+js/agentloop.js     shared hand-written agent loop (recall/show tools)
+js/ollama.js        live mode, local: Ollama transport for the agent loop
+js/deepseek.js      live mode, cloud: DeepSeek via /api/chat (default in production)
+js/memory.js        manifest loader, keyword search, document fetch
+js/markdown.js      minimal md→html (tables, blockquotes), zero dependencies
 js/agent.js         conversation state machine
-js/main.js          boot + wiring
+js/main.js          boot + UI (nodes, wires, overlays, typewriter reveal)
+api/chat.js         Vercel serverless proxy for DeepSeek (key stays server-side)
 content/            the memory vault (manifest.json + markdown docs)
 ```
