@@ -92,6 +92,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       .then(() => console.info('vector memory ready (' + Memory.entries.length + ' memories)'))
       .catch(err => console.warn('vector memory unavailable, agent will use keyword search:', err));
   }
+  if (DeepseekBrain.enabled) console.info('live brain mode: deepseek (cloud)');
 
   const input = document.getElementById('query');
 

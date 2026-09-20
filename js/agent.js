@@ -23,9 +23,12 @@ const Agent = (() => {
     setState('thinking');
 
     let res = null;
-    if (OllamaBrain.enabled) {
-      try { res = await OllamaBrain.answer(query); }
-      catch (err) { console.warn('ollama mode failed, falling back to static brain:', err); }
+    const liveBrain = DeepseekBrain.enabled ? DeepseekBrain
+                    : OllamaBrain.enabled ? OllamaBrain
+                    : null;
+    if (liveBrain) {
+      try { res = await liveBrain.answer(query); }
+      catch (err) { console.warn('live brain failed, falling back to static brain:', err); }
     }
     if (!res) {
       try { res = await Brain.answer(query); }
