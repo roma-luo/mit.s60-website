@@ -77,8 +77,14 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: border-color .3s ease, box-shadow .3s ease;
 }
 .node:focus-within { border-color: #ffffff; }
+/* ComfyUI-style running-module highlight */
+.node.active {
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 24px 60px rgba(0, 0, 0, 0.55);
+}
 
 .node__head {
   display: flex;
@@ -173,6 +179,7 @@ body {
   height: min(50vh, 520px);
   margin: 0 auto;
   background: #ffffff;   /* the clips are white-background: a photo in the card */
+  border-radius: var(--card-radius);
   overflow: hidden;
 }
 .portrait canvas,

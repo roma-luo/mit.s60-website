@@ -46,6 +46,11 @@ const UI = (() => {
     $('wire-in').classList.toggle('flow', st === 'thinking');
     $('wire-out').classList.toggle('flow', st === 'speaking');
     $('output-body').classList.toggle('thinking', st === 'thinking');
+    // ComfyUI-style: the running module's card border highlights
+    const active = { listening: 'node-input', thinking: 'node-self', speaking: 'node-output' }[st] || null;
+    for (const id of ['node-input', 'node-self', 'node-output']) {
+      $(id).classList.toggle('active', id === active);
+    }
   }
 
   function setMode(mode) {
@@ -63,20 +68,21 @@ const UI = (() => {
     row.querySelector('b').textContent = q.length > 60 ? q.slice(0, 60) + '…' : q;
   }
 
-  function buildSelfMeta() {
-    const p = Memory.persona;
-    const client = (p.course || '').split(/[,(]/)[0].trim().replace(/\s+at\s+the\s+/i, ' · ')
-      || 'MAS.S60 · MIT Media Lab';
-    let maxWeek = 0;
-    for (const e of Memory.entries) {
-      const m = (e.section || '').match(/week\s*(\d+)/i);
-      if (m) maxWeek = Math.max(maxWeek, +m[1]);
-    }
+  async function lastModified(url) {
+    try {
+      const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      const lm = r.headers.get('Last-Modified');
+      if (!lm) return '—';
+      const d = new Date(lm);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch (e) { return '—'; }
+  }
+
+  async function buildSelfMeta() {
     const meta = $('self-meta');
-    meta.appendChild(metaRow('Project', 'Digital Self'));
-    meta.appendChild(metaRow('Client', client));
-    meta.appendChild(metaRow('Design phase', maxWeek ? 'Week ' + maxWeek : '—'));
-    meta.appendChild(metaRow('Image type', Face === FaceVideo ? 'Video loop' : 'Procedural canvas'));
+    meta.appendChild(metaRow('Name', 'romaluo.digital'));
+    meta.appendChild(metaRow('Memory Updated', await lastModified('content/manifest.json')));
   }
 
   /* ---- wires: bezier paths between node edge midpoints (§5.1) */
