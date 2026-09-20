@@ -1,8 +1,8 @@
 # MAS S60 — Digital Self (course website)
 
-The website *is* the agent: a procedural face, a voice, and a memory vault
-containing every week of course work. Pure static site — no build step, no
-dependencies.
+The website *is* the agent: a face, a voice, and a memory vault containing
+every week of course work. Static front end (no build step, no dependencies)
++ two serverless API routes for the live brain.
 
 ## Run locally
 
@@ -12,8 +12,13 @@ The site fetches `content/manifest.json`, so it must be served over HTTP
 ```bash
 cd s60-webpage
 python -m http.server 8000
-# open http://localhost:8000
+# open http://localhost:8000  (static brain)
 ```
+
+For the live brain locally, use `vercel dev` so the API routes work, and
+fill `.env` (see `.env.example`) with `DEEPSEEK_API_KEY` (generation, via
+`/api/chat`) and `OPENAI_API_KEY` (embeddings, via `/api/recall`; optional —
+without it recall runs BM25-only).
 
 ## Use it
 
@@ -30,84 +35,90 @@ python -m http.server 8000
   three ideas"* → three cards fanned out). `See more` expands a card in
   place; the dot in its title bar dismisses it. No overlays, ever.
 - Drag any empty space to pan the canvas (wheel pans too, shift = sideways);
-  double-click empty space to reset the view. Under 700px the page falls
-  back to native vertical scrolling.
+  double-click empty space to reset the view. When the graph grows past the
+  viewport the whole canvas smoothly zooms out instead. Under 700px the page
+  falls back to native vertical scrolling.
 - `/index` or the tiny dot at bottom-right opens a card grid of every memory;
   click a card to load it into OUTPUT + a child node (no speech).
   `Esc` stops speech and folds expanded cards back.
 - Mic button = speech input (Chrome only).
-- Online (the Vercel deployment) the default brain is **DeepSeek** (live mode);
-  locally it stays the static brain unless you append `?brain=ollama` or
-  `?brain=deepseek`. If the live brain fails, it silently falls back to the
-  static one.
+- Online (the Vercel deployment) the default brain is **live** (cloud API);
+  locally it stays the static brain. `?brain=static` forces the static,
+  no-network mode anywhere. If the live brain fails it silently falls back
+  to static (and disables itself for the session on hosts with no backend).
 
-## Live brain mode (local LLM agent loop)
+## Live brain mode (cloud API agent loop)
 
-Requires Ollama with two models:
-
-```bash
-ollama serve                      # if not already running
-ollama pull qwen2.5:7b            # the brain
-ollama pull nomic-embed-text      # embeddings for vector memory
-```
-
-Open `http://localhost:8000/?brain=ollama`. This is a hand-written agent loop
-(no frameworks):
+Open the site on the Vercel deployment (or `vercel dev` locally). This is a
+hand-written agent loop (no frameworks):
 
 - the **harness** (system prompt) carries only the persona — name, affiliation,
   style — plus the tool protocol. No course content is stuffed into context.
 - the agent acts in a loop: it calls `recall(query)` to search its long-term
-  memory (vector embeddings + cosine similarity via `nomic-embed-text`, keyword
-  search as fallback) and `show(id)` to pull a document out for the visitor,
-  then answers in plain text when it has enough. Max 4 steps.
-- any failure (Ollama down, embed model missing) falls back to the static
-  brain.
-
-If the browser blocks the call (CORS), start Ollama with:
-
-```bash
-OLLAMA_ORIGINS="http://localhost:8000" ollama serve
-```
+  memory and `show(id)` / `show(ids:[..])` to pull documents out for the
+  visitor, then answers in plain text when it has enough. Max 4 steps.
+- **retrieval** is server-side: `POST /api/recall` fuses BM25 (always) with
+  vector cosine (OpenAI `text-embedding-3-small`, when `OPENAI_API_KEY` is
+  set) via Reciprocal Rank Fusion over a build-time chunk index; generation
+  is DeepSeek via `POST /api/chat`.
+- any failure (API down, keys missing, rate limit) falls back to keyword
+  search / the static brain.
 
 ## Add a memory (new week / new document)
 
-1. Write `content/<section>/<file>.md`.
-2. Register it in `content/manifest.json` — id, title, section, tags,
-   keywords, file path, and a one-paragraph spoken `answer`.
-3. Done. The brain, the index overlay, and live mode all pick it up.
+1. Write `content/<section>/<file>.md` with front matter on top:
 
-Who the digital self *is* lives in the `persona` block at the top of
-`manifest.json` — both the static brain and live mode read it from there.
+   ```md
+   ---
+   id: week2
+   label: WEEK 02
+   title: Week 2 — …
+   section: week 2
+   answer: A one-paragraph spoken summary the agent can read aloud if the API is down.
+   tags: [week2, …]
+   ---
+   ```
+
+   Every field is optional: `id` defaults to the file slug, `label`/`title`/
+   `answer` are derived from the document.
+2. Run `npm run build:index` (or just push — Vercel runs it as the build
+   command). This regenerates `content/manifest.json` **and** the search
+   index `content/index.json` (chunks + vectors when `OPENAI_API_KEY` is
+   set, BM25-only otherwise; incremental — only changed chunks re-embed).
+3. Done. No manifest edits, no keyword lists, no brain-rule changes.
+
+Who the digital self *is* lives in `content/persona.json`.
 
 ## Deploy
 
-Push this folder to the private course GitHub repo, then either:
-
-- **GitHub Pages** (needs GitHub Pro/Student for private repos): Settings →
-  Pages → serve from branch root; point your subdomain at
-  `<user>.github.io` with a CNAME record and set it in Settings → Pages →
-  Custom domain, or
-- **Any static host** (Cloudflare Pages / Netlify / your own server): upload
-  the folder as-is; point the subdomain's DNS at the host.
+- **Vercel** (primary): `vercel.json` sets `buildCommand: npm run
+  build:index`, so the manifest + index are regenerated on every deploy.
+  Set `DEEPSEEK_API_KEY` and `OPENAI_API_KEY` in the project env.
+- **GitHub Pages / any static host**: no API routes there — the site runs
+  fully on the committed `content/manifest.json` + the static brain.
+  `CNAME` points the subdomain.
 
 ## Structure
 
 ```
 index.html          single page: pannable canvas, node cards, wires svg, children column
-css/main.css        node-graph theme: design tokens, cards, wires, child nodes
-js/canvas.js        canvas panning: drag / wheel / double-click reset, clamp, auto-reveal
+css/main.css        node-graph theme: design tokens, beveled cards, wires, child nodes
+js/canvas.js        canvas pan + auto-fit zoom-out, clamp, auto-reveal
 js/face.js          procedural face renderer (fallback when video clips are missing)
 js/facevideo.js     video face renderer (assets/idle.mp4 + assets/talking.mp4 loops)
 js/voice.js         TTS mouth-driving + chunked speech + optional STT
-js/brain.js         static intent/retrieval brain
-js/rag.js           vector memory: embeddings + cosine search (live mode)
+js/brain.js         static fallback brain (canned + keyword search)
 js/agentloop.js     shared hand-written agent loop (recall/show tools)
-js/ollama.js        live mode, local: Ollama transport for the agent loop
-js/deepseek.js      live mode, cloud: DeepSeek via /api/chat (default in production)
-js/memory.js        manifest loader, keyword search, document fetch
+js/apibrain.js      live mode: DeepSeek via /api/chat, recall via /api/recall
+js/memory.js        manifest + persona loader, keyword search, document fetch
 js/markdown.js      minimal md→html (tables, blockquotes), zero dependencies
 js/agent.js         conversation state machine
-js/main.js          boot + UI (nodes, wires, overlays, typewriter reveal)
-api/chat.js         Vercel serverless proxy for DeepSeek (key stays server-side)
-content/            the memory vault (manifest.json + markdown docs)
+js/main.js          boot + UI (nodes, wires, children, typewriter reveal)
+api/chat.js         serverless proxy: DeepSeek chat completions
+api/recall.js       serverless search: BM25 + vector RRF over content/index.json
+lib/                embed.js (OpenAI query vectors), index.js (index loader),
+                    search.js (hybrid retrieval), tokens.js (shared tokenizer)
+scripts/build-index.mjs   generates content/manifest.json + content/index.json
+content/            the memory vault: persona.json, front-matter .md docs,
+                      generated manifest.json / index.json / .embed-cache.json
 ```
