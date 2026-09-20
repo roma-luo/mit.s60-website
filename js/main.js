@@ -101,9 +101,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (ev.key === 'Escape') {
       UI.hideIndex();
       Memory.hidePanel();
-      Voice.stop();
-      Face.setMouth(0);
-      Face.setState('idle');
+      Agent.cancel();
       return;
     }
     if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey) {
