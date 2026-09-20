@@ -5,6 +5,8 @@
  *   Memory.search(query)         — scored entries, best first: [{entry, score}]
  *   Memory.byId(id)
  *   await Memory.fetchDoc(entry) — markdown source (cached)
+ *   await Memory.firstImage(entry) — first ![..](src) of the doc, resolved
+ *                                    against the doc's own URL (or null)
  */
 const Memory = (() => {
   let entries = [];
@@ -31,6 +33,17 @@ const Memory = (() => {
       docCache[entry.id] = await res.text();
     }
     return docCache[entry.id];
+  }
+
+  // first ![alt](src) in the document; relative paths resolve against the
+  // md file's own directory (subpath-safe via document.baseURI)
+  async function firstImage(entry) {
+    try {
+      const md = await fetchDoc(entry);
+      const m = md.match(/!\[[^\]]*\]\(([^)\s]+)\)/);
+      if (!m) return null;
+      return new URL(m[1], new URL(entry.file, document.baseURI)).href;
+    } catch (e) { return null; }
   }
 
   // CJK runs get bigrams; latin text gets words.
@@ -66,7 +79,7 @@ const Memory = (() => {
   }
 
   return {
-    load, search, byId, fetchDoc,
+    load, search, byId, fetchDoc, firstImage,
     get entries() { return entries; },
     get persona() { return persona; }
   };

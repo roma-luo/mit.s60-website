@@ -6,6 +6,7 @@
  *                          (B3), and the new round starts immediately.
  *   Agent.cancel()       — Esc: same interrupt, then back to idle.
  *   Agent.setState(st)   — drives Face and UI together (§6).
+ *   Agent.showEntry(entry) — index card: OUTPUT + doc overlay, no speech (§5.3).
  * busy is reset in try/finally (B2); voice.js additionally carries a
  * watchdog for browsers that never fire SpeechSynthesis onend.
  */
@@ -94,5 +95,14 @@ const Agent = (() => {
     }
   }
 
-  return { handle, cancel, setState };
+  // §5.3: index card picked — update OUTPUT + open the doc, no brain, no speech
+  async function showEntry(entry) {
+    interrupt();
+    Face.setMouth(0);
+    await UI.setAnswer({ text: entry.answer, docId: entry.id }, entry);
+    setState('showing');
+    UI.openDoc(entry);
+  }
+
+  return { handle, cancel, setState, showEntry };
 })();

@@ -183,7 +183,16 @@ const UI = (() => {
 
       const body = document.createElement('div');
       body.className = 'node__body';
-      body.textContent = e.section; // image thumbnails join in a later step
+      body.textContent = e.section; // fallback: section letters as placeholder
+      Memory.firstImage(e).then(url => {
+        if (!url) return;
+        body.textContent = '';
+        body.classList.add('has-image');
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = e.title;
+        body.appendChild(img);
+      });
 
       const meta = document.createElement('footer');
       meta.className = 'node__meta';
@@ -202,7 +211,7 @@ const UI = (() => {
       card.addEventListener('click', ev => {
         ev.preventDefault();
         hideIndex();
-        openDoc(e); // OUTPUT-sync (Agent.showEntry) joins in a later step
+        Agent.showEntry(e);
       });
       grid.appendChild(card);
     }
