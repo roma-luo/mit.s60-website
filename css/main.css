@@ -25,6 +25,14 @@
   --card-shadow-pressed: inset 0 2px 8px rgba(0,0,0,0.9), inset 0 0 0 1px var(--card-groove);
   --card-dim: 0.28;           /* opacity of dimmed / unfocused cards */
 
+  /* pills: same material recipe, proportioned for ~26px-tall buttons */
+  --pill-shadow:
+    inset 0 1px 0 var(--card-rim-hi),
+    inset 0 -1px 0 rgba(255,255,255,0.04),
+    inset 0 0 0 1px var(--card-groove),
+    inset 0 0 6px rgba(0,0,0,0.45),
+    0 4px 12px rgba(0,0,0,0.5);
+
   /* labels: uppercase, tracked-out, light grey (not pure white) */
   --label-color: #d4d4d4;
   --label-tracking: 0.18em;
@@ -149,7 +157,7 @@ body {
   padding: 7px 16px;
   background: var(--card-face);
   border: 1px solid var(--card-rim);
-  box-shadow: var(--card-shadow);
+  box-shadow: var(--pill-shadow);
   color: var(--label-color);
   font-family: var(--font);
   font-size: 10px;
@@ -239,7 +247,7 @@ body {
 #children { display: flex; flex-direction: column; gap: 24px; align-self: center; }
 #children:empty { display: none; }
 #children.dim .child { opacity: var(--card-dim); }
-.child { width: clamp(220px, 20vw, 300px); transition: opacity .12s ease, transform .12s ease, width .2s ease; }
+.child { width: clamp(220px, 20vw, 300px); transition: opacity .12s ease, transform .12s ease, width .2s ease, border-color .3s ease, box-shadow .3s ease; }
 .child.entering { opacity: 0; transform: translateX(-8px); }
 .child.leaving { opacity: 0; }
 .child.expanded { width: clamp(300px, 28vw, 420px); }

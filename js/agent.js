@@ -75,8 +75,9 @@ const Agent = (() => {
       const entries = (res.docIds || []).map(Memory.byId).filter(Boolean);
       setState('speaking');
       await UI.setAnswer(res, { reveal: true });
-      UI.startReveal(res.text, res.text.length * 60); // uniform fallback pace;
-      // speech boundary events drive revealAnswer ahead of it when available
+      UI.startReveal(res.text, res.text.length * 85); // uniform fallback pace
+      // (~85ms/char ≈ TTS rate); speech boundary events pull revealAnswer to
+      // the exact position when the browser provides them
       UI.spawnChildren(entries, myRound); // self-stops if the round is superseded
 
       await Promise.race([
