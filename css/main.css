@@ -8,13 +8,26 @@
   --grid-dot: rgba(255,255,255,0.14);
   --grid-size: 96px;
 
-  /* cards: dark grey body, lighter title bar, thin bright edge */
-  --card-bg: #2b2b2b;
-  --card-head: #5a5a5a;
-  --card-border: rgba(255,255,255,0.55);
-  --card-radius: 4px;
-  --card-shadow: 0 0 0 1px rgba(0,0,0,0.6), 0 24px 60px rgba(0,0,0,0.55);
+  /* cards: beveled black capsule material — face, rim, groove, inner vignette */
+  --card-face: radial-gradient(120% 90% at 50% 0%, #1c1c1c 0%, #0e0e0e 55%, #070707 100%);
+  --card-head-face: linear-gradient(180deg, #232323 0%, #121212 100%);
+  --card-rim: rgba(255,255,255,0.14);       /* base ring */
+  --card-rim-hi: rgba(255,255,255,0.34);    /* top-edge highlight */
+  --card-groove: rgba(0,0,0,0.85);          /* groove inside the rim */
+  --card-radius: 8px;
+  --card-shadow:
+    inset 0 1px 0 var(--card-rim-hi),
+    inset 0 -1px 0 rgba(255,255,255,0.05),
+    inset 0 0 0 1px var(--card-groove),
+    inset 0 0 22px rgba(0,0,0,0.65),
+    0 18px 50px rgba(0,0,0,0.6);
+  --card-shadow-active: var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.08);
+  --card-shadow-pressed: inset 0 2px 8px rgba(0,0,0,0.9), inset 0 0 0 1px var(--card-groove);
   --card-dim: 0.28;           /* opacity of dimmed / unfocused cards */
+
+  /* labels: uppercase, tracked-out, light grey (not pure white) */
+  --label-color: #d4d4d4;
+  --label-tracking: 0.18em;
 
   /* text */
   --fg: #ffffff;
@@ -74,8 +87,8 @@ body {
 /* ---- node skeleton (three nodes, child nodes, index cards all reuse it) */
 .node {
   position: relative;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
+  background: var(--card-face);
+  border: 1px solid var(--card-rim);
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow);
   color: var(--fg);
@@ -85,23 +98,30 @@ body {
   overflow: hidden;
   transition: border-color .3s ease, box-shadow .3s ease;
 }
-.node:focus-within { border-color: #ffffff; }
-/* ComfyUI-style running-module highlight */
-.node.active {
-  border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 24px 60px rgba(0, 0, 0, 0.55);
+/* focused card / ComfyUI-style running module: the rim brightens */
+.node.active,
+.node:focus-within {
+  border-color: rgba(255,255,255,0.28);
+  box-shadow: var(--card-shadow-active);
 }
 
 .node__head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 28px;
+  height: 30px;
   padding: 0 10px;
-  background: var(--card-head);
-  font-size: var(--fs-head);
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  background: var(--card-head-face);
+  border-bottom: 1px solid rgba(0,0,0,0.9);           /* groove between head and body */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22),   /* the head's own top highlight */
+              0 1px 0 rgba(255,255,255,0.05);         /* faint reflection below */
+}
+.node__label {
+  color: var(--label-color);
+  font-weight: 300;
+  font-size: 11px;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
 }
 .node__led {
   width: 9px;
@@ -114,17 +134,33 @@ body {
 
 .node__body { padding: 10px; flex: 1; min-height: 0; }
 .node__meta { padding: 6px 10px 3px; font-size: var(--fs-body); line-height: 1.6; }
-.meta-row span { color: var(--fg-2); margin-right: .4em; }
-.meta-row b { font-weight: 600; color: var(--fg); }
-.node__more {
-  display: block;
-  padding: 8px 10px 10px;
-  font-size: var(--fs-body);
-  color: var(--fg);
+.meta-row span { color: var(--fg-3); margin-right: .4em; }
+.meta-row b { font-weight: 400; color: var(--label-color); }
+/* See more / See less links are capsule pills, left-aligned in their row */
+.node__more { align-self: flex-start; margin: 8px 10px 12px; }
+
+/* ---- capsule buttons: the same beveled material as the cards */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: var(--card-face);
+  border: 1px solid var(--card-rim);
+  box-shadow: var(--card-shadow);
+  color: var(--label-color);
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 300;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
   text-decoration: none;
-  opacity: .9;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, box-shadow .1s;
 }
-.node__more:hover { text-decoration: underline; }
+.pill:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+.pill:active { box-shadow: var(--card-shadow-pressed); }
 
 /* close control for overlay nodes: 9px dot, × on hover */
 .node__close { position: relative; width: 16px; height: 16px; background: none; border: none; cursor: pointer; }
@@ -162,21 +198,10 @@ body {
 }
 #query::placeholder { color: var(--fg-3); }
 .input-tools { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-#mic-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  color: var(--fg-2);
-  font-family: var(--font);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-}
+/* #mic-btn is a .pill (class attached in index.html); the REC dot rides inside */
 #mic-btn .mic-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg-3); }
 #mic-btn.listening .mic-dot { background: var(--led-listening); }
-.hint { color: var(--fg-3); font-size: 10px; }
+.hint { color: var(--fg-3); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 
 /* ---- SELF (center, portrait window) */
 .portrait {
@@ -185,7 +210,9 @@ body {
   height: min(50vh, 520px);
   margin: 0 auto;
   background: #ffffff;   /* the clips are white-background: a photo in the card */
-  border-radius: var(--card-radius);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.9),
+              inset 0 1px 0 rgba(255,255,255,0.15);
   overflow: hidden;
 }
 .portrait canvas,
@@ -196,6 +223,7 @@ body {
   height: 100%;
   object-fit: cover;
   object-position: 50% 0;   /* top-aligned: the top of the head is never cut */
+  border-radius: inherit;   /* keep the video corners from covering the groove */
 }
 .portrait .face-video { opacity: 0; transition: opacity .35s ease; pointer-events: none; }
 .portrait .face-video.front { opacity: 1; }
@@ -243,7 +271,7 @@ body {
   padding: 6vh 6vw;
   background: var(--bg);
 }
-#index-title { color: var(--fg-2); font-size: 11px; letter-spacing: 0.08em; margin-bottom: 24px; }
+#index-title { color: var(--label-color); font-size: 11px; letter-spacing: var(--label-tracking); margin-bottom: 24px; }
 #index-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
 .index-card { cursor: pointer; }
 .index-card .node__body {

@@ -327,7 +327,7 @@ const UI = (() => {
     meta.appendChild(metaRow('Source', entry.file));
 
     const more = document.createElement('a');
-    more.className = 'node__more';
+    more.className = 'node__more pill';
     more.href = '#';
     more.textContent = 'See more';
     more.addEventListener('click', ev => { ev.preventDefault(); toggleChild(card, entry); });
@@ -472,7 +472,7 @@ const UI = (() => {
       meta.appendChild(metaRow('Section', e.section));
 
       const more = document.createElement('a');
-      more.className = 'node__more';
+      more.className = 'node__more pill';
       more.href = '#';
       more.textContent = 'See more';
 
