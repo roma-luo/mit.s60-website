@@ -553,9 +553,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   if (DeepseekBrain.enabled) console.info('live brain mode: deepseek (cloud)');
 
-  UI.setMode(DeepseekBrain.enabled ? 'live·deepseek'
-           : OllamaBrain.enabled ? 'live·ollama'
-           : 'static');
+  UI.setMode(DeepseekBrain.enabled || OllamaBrain.enabled ? 'live' : 'static');
   UI.buildSelfMeta();
 
   // wires: recompute on resize, font load, video metadata (face:ready), and

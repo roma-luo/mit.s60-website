@@ -44,8 +44,8 @@
   --fg-3: rgba(255,255,255,0.45);   /* hints, placeholders */
   --font: "Helvetica Neue", "HelveticaNeue-Light", "Helvetica Light", Helvetica, Arial, sans-serif;
   --fs-head: 12px;   /* title bar */
-  --fs-body: 11px;   /* metadata rows */
-  --fs-text: 13px;   /* answer body */
+  --fs-body: 10px;   /* metadata rows */
+  --fs-text: 11px;   /* answer body */
 
   /* status LEDs (title-bar dots) */
   --led-idle: #d9d9d9;
