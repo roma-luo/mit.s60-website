@@ -142,15 +142,15 @@ const UI = (() => {
 
   // every child card gets one wire from OUTPUT's right-edge midpoint — a fan
   // with a single shared origin (mobile chain variant lands in a later step)
-  function syncChildWires(ro) {
+  function syncChildWires(rel, ro) {
     const svg = $('wires');
     const seen = new Set();
     for (const card of $('children').children) {
       const id = card.dataset.id;
       seen.add(id);
       const { path, dotA, dotB } = childWireEls(svg, id);
-      const rc = card.getBoundingClientRect();
-      setWire(path, dotA, dotB, ro.right, ro.top + ro.height / 2, rc.left, rc.top + rc.height / 2);
+      const rc = rel(card);
+      setWire(path, dotA, dotB, ro.r, ro.t + ro.h / 2, rc.l, rc.t + rc.h / 2);
     }
     for (const el of svg.querySelectorAll('[data-for]')) {
       if (!seen.has(el.dataset.for)) el.remove();
@@ -159,20 +159,33 @@ const UI = (() => {
 
   function updateWires() {
     const svg = $('wires');
-    svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
-    const ri = $('node-input').getBoundingClientRect();
-    const rs = $('node-self').getBoundingClientRect();
-    const ro = $('node-output').getBoundingClientRect();
+    const graph = $('graph');
+    // the svg spans the whole graph; all points are in canvas space
+    // (rect(el) − rect(#canvas)), so panning moves wires with the cards
+    // without any recompute
+    const w = graph.scrollWidth;
+    const h = graph.scrollHeight;
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    const c = $('canvas').getBoundingClientRect();
+    const rel = el => {
+      const r = el.getBoundingClientRect();
+      return { l: r.left - c.left, t: r.top - c.top, r: r.right - c.left, b: r.bottom - c.top, w: r.width, h: r.height };
+    };
+    const ri = rel($('node-input'));
+    const rs = rel($('node-self'));
+    const ro = rel($('node-output'));
     if (window.innerWidth < 700) {
       // mobile stacks SELF → OUTPUT → INPUT: same bezier, vertical axis
-      setNamedWire('wire-in', rs.left + rs.width / 2, rs.bottom, ro.left + ro.width / 2, ro.top, true);
-      setNamedWire('wire-out', ro.left + ro.width / 2, ro.bottom, ri.left + ri.width / 2, ri.top, true);
+      setNamedWire('wire-in', rs.l + rs.w / 2, rs.b, ro.l + ro.w / 2, ro.t, true);
+      setNamedWire('wire-out', ro.l + ro.w / 2, ro.b, ri.l + ri.w / 2, ri.t, true);
     } else {
       // INPUT right-edge midpoint → SELF left-edge midpoint; SELF → OUTPUT same
-      setNamedWire('wire-in', ri.right, ri.top + ri.height / 2, rs.left, rs.top + rs.height / 2);
-      setNamedWire('wire-out', rs.right, rs.top + rs.height / 2, ro.left, ro.top + ro.height / 2);
+      setNamedWire('wire-in', ri.r, ri.t + ri.h / 2, rs.l, rs.t + rs.h / 2);
+      setNamedWire('wire-out', rs.r, rs.t + rs.h / 2, ro.l, ro.t + ro.h / 2);
     }
-    syncChildWires(ro);
+    syncChildWires(rel, ro);
   }
 
   /* ---- OUTPUT node (text only; attached docs live in child nodes) */
@@ -358,13 +371,16 @@ const UI = (() => {
       card.remove();
     }
     setAttached(entries.length);
+    let last = null;
     for (const entry of entries) {
       if (!alive()) break;
       const card = buildChild(entry);
       host.appendChild(card);
       if (nodeObserver) nodeObserver.observe(card);
       updateWires();
+      last = card;
     }
+    if (last && alive() && typeof Canvas !== 'undefined') Canvas.reveal(last);
   }
 
   /* ---- index overlay */
@@ -470,15 +486,15 @@ window.addEventListener('DOMContentLoaded', async () => {
            : 'static');
   UI.buildSelfMeta();
 
-  // wires: recompute on resize, scroll, font load, video metadata (face:ready),
-  // and whenever a node's box changes
+  // wires: recompute on resize, font load, video metadata (face:ready), and
+  // whenever a node's box changes (panning needs no recompute — canvas space)
   window.addEventListener('resize', UI.updateWires);
-  window.addEventListener('scroll', UI.updateWires, { passive: true });
   document.addEventListener('face:ready', UI.updateWires);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(UI.updateWires);
   const nodeObserver = new ResizeObserver(UI.updateWires);
   ['node-input', 'node-self', 'node-output', 'children'].forEach(id => nodeObserver.observe(document.getElementById(id)));
   UI.setNodeObserver(nodeObserver);
+  Canvas.init();
   UI.updateWires();
 
   const input = document.getElementById('query');

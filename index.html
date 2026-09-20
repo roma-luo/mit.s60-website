@@ -8,16 +8,17 @@
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-  <svg id="wires" aria-hidden="true">
-    <path id="wire-in" class="wire" d=""/>
-    <path id="wire-out" class="wire" d=""/>
-    <circle id="wire-in-a" class="wire-dot" r="3"/>
-    <circle id="wire-in-b" class="wire-dot" r="3"/>
-    <circle id="wire-out-a" class="wire-dot" r="3"/>
-    <circle id="wire-out-b" class="wire-dot" r="3"/>
-  </svg>
+  <div id="canvas">
+    <svg id="wires" aria-hidden="true">
+      <path id="wire-in" class="wire" d=""/>
+      <path id="wire-out" class="wire" d=""/>
+      <circle id="wire-in-a" class="wire-dot" r="3"/>
+      <circle id="wire-in-b" class="wire-dot" r="3"/>
+      <circle id="wire-out-a" class="wire-dot" r="3"/>
+      <circle id="wire-out-b" class="wire-dot" r="3"/>
+    </svg>
 
-  <main id="graph">
+    <main id="graph">
     <section class="node" id="node-input" data-label="S60-IN">
       <header class="node__head">
         <span class="node__label">S60-IN</span>
@@ -59,7 +60,8 @@
     </section>
 
     <div id="children"></div>
-  </main>
+    </main>
+  </div>
 
   <div id="index-overlay" class="hidden">
     <p id="index-title">INDEX</p>
@@ -79,6 +81,7 @@
   <script src="js/ollama.js"></script>
   <script src="js/deepseek.js"></script>
   <script src="js/agent.js"></script>
+  <script src="js/canvas.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

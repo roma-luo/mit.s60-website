@@ -39,7 +39,7 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html, body { width: 100%; min-height: 100%; }
+html, body { width: 100%; height: 100%; overflow: hidden; }   /* desktop: no native scroll, the canvas pans */
 
 body {
   background: var(--bg);
@@ -52,6 +52,11 @@ body {
 
 .hidden { display: none !important; }
 
+/* ---- the canvas: the layer that gets translate()d when panning */
+#canvas { position: absolute; left: 0; top: 0; will-change: transform; cursor: grab; }
+#canvas.panning { cursor: grabbing; }
+#canvas .node { cursor: auto; }
+
 /* ---- the graph: node columns + the children column, SELF sets row height */
 #graph {
   position: relative;
@@ -60,8 +65,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: clamp(48px, 6vw, 120px);
+  width: max-content;
+  min-width: 100vw;
   min-height: 100vh;
-  padding: 5vh 4vw;
+  padding: 5vh 6vw;
 }
 
 /* ---- node skeleton (three nodes, child nodes, index cards all reuse it) */
@@ -253,8 +260,8 @@ body {
 .index-card .node__body.has-image { padding: 0; }
 .index-card .node__body img { display: block; width: 100%; max-height: 140px; object-fit: cover; }
 
-/* ---- wires: fixed svg layer under the graph, paths set by UI.updateWires */
-#wires { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+/* ---- wires: svg layer inside the canvas, sized to the graph by updateWires */
+#wires { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; }
 .wire { stroke: var(--wire); stroke-width: var(--wire-w); fill: none; }
 .wire-dot { fill: var(--wire); }
 .wire.flow { stroke-dasharray: 4 6; animation: wire-flow .8s linear infinite; }
@@ -293,7 +300,9 @@ body {
 }
 
 @media (max-width: 699px) {
-  #graph { flex-direction: column; gap: 32px; padding: 4vh 5vw; }
+  html, body { overflow: auto; }   /* mobile: native vertical scroll, no pan */
+  #canvas { position: static; transform: none !important; will-change: auto; cursor: auto; }
+  #graph { flex-direction: column; gap: 32px; padding: 4vh 5vw; width: auto; min-width: 0; }
   #node-self { order: 1; }
   #node-output { order: 2; width: auto; }
   #node-input { order: 3; width: auto; position: sticky; bottom: 0; }
