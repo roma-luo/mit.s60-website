@@ -17,17 +17,24 @@ python -m http.server 8000
 
 ## Use it
 
-- The screen is a small node graph: **INPUT** (left), **SELF** (the portrait
-  window, center — its title-bar dot is the status LED), **OUTPUT** (right),
-  connected by bezier wires. The input box is always on screen, always ready.
+- The screen is a small node graph on a pannable canvas: **INPUT** (left),
+  **SELF** (the portrait window, center — its title-bar dot is the status
+  LED), **OUTPUT** (right), connected by bezier wires. The input box is
+  always on screen, always ready.
 - Type a question, `Enter` to send (`Shift+Enter` = newline, `/` focuses the
-  box). Ask: *"what did you do in week 1"*, *"final project ideas"*, *"who are you"*.
+  box). Ask: *"what did you do in week 1"*, *"the three project ideas"*,
+  *"who are you"*.
 - The agent answers aloud while the answer types out in OUTPUT, in sync with
-  the voice; it also **pulls the matching document out of its memory**
-  (auto-opens, or `See more` under the answer).
+  the voice. Memories it cites appear as **child nodes** to the right of
+  OUTPUT, one card each on their own wire — several at once (*"what are the
+  three ideas"* → three cards fanned out). `See more` expands a card in
+  place; the dot in its title bar dismisses it. No overlays, ever.
+- Drag any empty space to pan the canvas (wheel pans too, shift = sideways);
+  double-click empty space to reset the view. Under 700px the page falls
+  back to native vertical scrolling.
 - `/index` or the tiny dot at bottom-right opens a card grid of every memory;
-  click a card to load it into OUTPUT + the document overlay (no speech).
-  `Esc` closes overlays and stops speech.
+  click a card to load it into OUTPUT + a child node (no speech).
+  `Esc` stops speech and folds expanded cards back.
 - Mic button = speech input (Chrome only).
 - Online (the Vercel deployment) the default brain is **DeepSeek** (live mode);
   locally it stays the static brain unless you append `?brain=ollama` or
@@ -86,8 +93,9 @@ Push this folder to the private course GitHub repo, then either:
 ## Structure
 
 ```
-index.html          single page: three node cards (INPUT / SELF / OUTPUT) + wires svg
-css/main.css        node-graph theme: design tokens, cards, wires, overlays
+index.html          single page: pannable canvas, node cards, wires svg, children column
+css/main.css        node-graph theme: design tokens, cards, wires, child nodes
+js/canvas.js        canvas panning: drag / wheel / double-click reset, clamp, auto-reveal
 js/face.js          procedural face renderer (fallback when video clips are missing)
 js/facevideo.js     video face renderer (assets/idle.mp4 + assets/talking.mp4 loops)
 js/voice.js         TTS mouth-driving + chunked speech + optional STT
