@@ -6,6 +6,7 @@
  *   Memory.byId(id)
  *   Memory.label(entry)        — display label ("WEEK 01"), entry.label or derived
  *   await Memory.fetchDoc(entry) — markdown source (cached)
+ *   await Memory.excerpt(entry)  — first plain paragraph, ≤220 chars
  *   await Memory.firstImage(entry) — first ![..](src) of the doc, resolved
  *                                    against the doc's own URL (or null)
  */
@@ -56,6 +57,23 @@ const Memory = (() => {
     } catch (e) { return null; }
   }
 
+  // first real paragraph of the doc (skipping headings, blockquotes, tables,
+  // fences, hr, list items, blanks), cut at 220 chars
+  async function excerpt(entry) {
+    try {
+      const md = await fetchDoc(entry);
+      const buf = [];
+      for (const raw of md.split('\n')) {
+        const l = raw.trim();
+        const structural = !l || /^#|^>|^\||^```|^---|^\s*[-*]\s|^\s*\d+[.)]\s|!?\[/.test(l);
+        if (structural) { if (buf.length) break; continue; }
+        buf.push(l);
+      }
+      const text = buf.join(' ');
+      return text.length > 220 ? text.slice(0, 220).trimEnd() + '…' : text;
+    } catch (e) { return ''; }
+  }
+
   // CJK runs get bigrams; latin text gets words.
   function tokens(q) {
     q = q.toLowerCase();
@@ -89,7 +107,7 @@ const Memory = (() => {
   }
 
   return {
-    load, search, byId, fetchDoc, firstImage, label,
+    load, search, byId, fetchDoc, firstImage, label, excerpt,
     get entries() { return entries; },
     get persona() { return persona; }
   };

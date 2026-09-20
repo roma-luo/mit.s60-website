@@ -1,25 +1,33 @@
 /* main — boot and UI wiring for the node-graph layout.
  * Exposes the UI object used by Agent:
- *   UI.setState(st)            — LED + INPUT Status meta
- *   UI.setAnswer(res, entry)   — rebuild the OUTPUT node body
- *   UI.setLastQuery(q)         — INPUT meta third row
- *   UI.openDoc(entry) / UI.closeDoc()
+ *   UI.setState(st)              — LED + INPUT Status meta + wire flow + active card
+ *   UI.setAnswer(res, opts)      — rebuild the OUTPUT node body (text only)
+ *   UI.spawnChildren(entries, round) / UI.cancelSpawn() / UI.collapseChildren()
+ *   UI.setLastQuery(q)           — INPUT meta third row
  *   UI.showIndex() / UI.hideIndex()
+ * Answers bring their documents out as CHILD NODES on the canvas — there are
+ * no overlays or masks; "See more" expands a child card in place.
  */
 
 const LABELS = {
   input: 'S60-IN',
   self: 'S60-SELF',
+  out: 'S60-OUT',
   output: n => 'S60-OUT-' + String(n).padStart(2, '0'),
+  child: (outLabel, entry) => outLabel + '-' + Memory.label(entry),
   mem: id => 'S60-MEM-' + String(id).toUpperCase()
 };
 
 const UI = (() => {
   const $ = id => document.getElementById(id);
+  const SVGNS = 'http://www.w3.org/2000/svg';
   let answerCount = 0;
   let answerEl = null;
   let answerText = '';
   let revealTimer = null;
+  let spawnGen = 0;
+  let spawnRound = null;
+  let nodeObserver = null;
 
   function metaRow(key, value) {
     const row = document.createElement('div');
@@ -46,6 +54,9 @@ const UI = (() => {
     $('wire-in').classList.toggle('flow', st === 'thinking');
     $('wire-out').classList.toggle('flow', st === 'speaking');
     $('output-body').classList.toggle('thinking', st === 'thinking');
+    // thinking dims last round's children; they are replaced when the new
+    // answer lands (not deleted upfront)
+    $('children').classList.toggle('dim', st === 'thinking');
     // ComfyUI-style: the running module's card border highlights
     const active = { listening: 'node-input', thinking: 'node-self', speaking: 'node-output' }[st] || null;
     for (const id of ['node-input', 'node-self', 'node-output']) {
@@ -85,16 +96,65 @@ const UI = (() => {
     meta.appendChild(metaRow('Memory Updated', await lastModified('content/manifest.json')));
   }
 
-  /* ---- wires: bezier paths between node edge midpoints (§5.1) */
-  function setWire(name, x1, y1, x2, y2, vertical) {
-    const d = vertical
+  /* ---- wires: bezier paths between node edge midpoints */
+  function wireD(x1, y1, x2, y2, vertical) {
+    return vertical
       ? `M ${x1} ${y1} C ${x1} ${y1 + (y2 - y1) * 0.5}, ${x2} ${y2 - (y2 - y1) * 0.5}, ${x2} ${y2}`
       : `M ${x1} ${y1} C ${x1 + (x2 - x1) * 0.5} ${y1}, ${x2 - (x2 - x1) * 0.5} ${y2}, ${x2} ${y2}`;
-    $(name).setAttribute('d', d);
-    const a = $(name + '-a');
-    const b = $(name + '-b');
-    a.setAttribute('cx', x1); a.setAttribute('cy', y1);
-    b.setAttribute('cx', x2); b.setAttribute('cy', y2);
+  }
+
+  function setWire(path, dotA, dotB, x1, y1, x2, y2, vertical) {
+    path.setAttribute('d', wireD(x1, y1, x2, y2, vertical));
+    dotA.setAttribute('cx', x1); dotA.setAttribute('cy', y1);
+    dotB.setAttribute('cx', x2); dotB.setAttribute('cy', y2);
+  }
+
+  function setNamedWire(name, x1, y1, x2, y2, vertical) {
+    setWire($(name), $(name + '-a'), $(name + '-b'), x1, y1, x2, y2, vertical);
+  }
+
+  // one wire per child, created on demand and keyed by the child's data-id
+  function childWireEls(svg, id) {
+    let path = svg.querySelector('path.wire-child[data-for="' + id + '"]');
+    if (path) {
+      return {
+        path,
+        dotA: svg.querySelector('circle.wire-child-a[data-for="' + id + '"]'),
+        dotB: svg.querySelector('circle.wire-child-b[data-for="' + id + '"]')
+      };
+    }
+    path = document.createElementNS(SVGNS, 'path');
+    path.setAttribute('class', 'wire wire-child');
+    path.dataset.for = id;
+    const dotA = document.createElementNS(SVGNS, 'circle');
+    dotA.setAttribute('class', 'wire-dot wire-child-a');
+    dotA.setAttribute('r', 3);
+    dotA.dataset.for = id;
+    const dotB = document.createElementNS(SVGNS, 'circle');
+    dotB.setAttribute('class', 'wire-dot wire-child-b');
+    dotB.setAttribute('r', 3);
+    dotB.dataset.for = id;
+    svg.appendChild(path);
+    svg.appendChild(dotA);
+    svg.appendChild(dotB);
+    return { path, dotA, dotB };
+  }
+
+  // every child card gets one wire from OUTPUT's right-edge midpoint — a fan
+  // with a single shared origin (mobile chain variant lands in a later step)
+  function syncChildWires(ro) {
+    const svg = $('wires');
+    const seen = new Set();
+    for (const card of $('children').children) {
+      const id = card.dataset.id;
+      seen.add(id);
+      const { path, dotA, dotB } = childWireEls(svg, id);
+      const rc = card.getBoundingClientRect();
+      setWire(path, dotA, dotB, ro.right, ro.top + ro.height / 2, rc.left, rc.top + rc.height / 2);
+    }
+    for (const el of svg.querySelectorAll('[data-for]')) {
+      if (!seen.has(el.dataset.for)) el.remove();
+    }
   }
 
   function updateWires() {
@@ -104,18 +164,19 @@ const UI = (() => {
     const rs = $('node-self').getBoundingClientRect();
     const ro = $('node-output').getBoundingClientRect();
     if (window.innerWidth < 700) {
-      // mobile stacks SELF → OUTPUT → INPUT: same bezier, vertical axis (§7)
-      setWire('wire-in', rs.left + rs.width / 2, rs.bottom, ro.left + ro.width / 2, ro.top, true);
-      setWire('wire-out', ro.left + ro.width / 2, ro.bottom, ri.left + ri.width / 2, ri.top, true);
+      // mobile stacks SELF → OUTPUT → INPUT: same bezier, vertical axis
+      setNamedWire('wire-in', rs.left + rs.width / 2, rs.bottom, ro.left + ro.width / 2, ro.top, true);
+      setNamedWire('wire-out', ro.left + ro.width / 2, ro.bottom, ri.left + ri.width / 2, ri.top, true);
     } else {
       // INPUT right-edge midpoint → SELF left-edge midpoint; SELF → OUTPUT same
-      setWire('wire-in', ri.right, ri.top + ri.height / 2, rs.left, rs.top + rs.height / 2);
-      setWire('wire-out', rs.right, rs.top + rs.height / 2, ro.left, ro.top + ro.height / 2);
+      setNamedWire('wire-in', ri.right, ri.top + ri.height / 2, rs.left, rs.top + rs.height / 2);
+      setNamedWire('wire-out', rs.right, rs.top + rs.height / 2, ro.left, ro.top + ro.height / 2);
     }
+    syncChildWires(ro);
   }
 
-  /* ---- OUTPUT node */
-  async function setAnswer(res, entry, opts = {}) {
+  /* ---- OUTPUT node (text only; attached docs live in child nodes) */
+  async function setAnswer(res, opts = {}) {
     stopReveal();
     answerCount++;
     $('output-label').textContent = LABELS.output(answerCount);
@@ -125,47 +186,14 @@ const UI = (() => {
     const body = $('output-body');
     body.classList.remove('thinking');
     body.innerHTML = '';
-    answerEl = null;
     answerText = res.text || '';
+    const p = document.createElement('p');
+    p.className = 'answer';
+    p.textContent = opts.reveal ? '' : answerText;
+    body.appendChild(p);
+    answerEl = p;
 
-    // §4.3 three forms: text only / image dominant (short text moves to meta)
-    // / image + text — picked from whether the doc has a first image
-    let imgUrl = null;
-    if (entry) {
-      try { imgUrl = await Memory.firstImage(entry); } catch (e) { imgUrl = null; }
-    }
-    const imgOnly = !!imgUrl && answerText.length > 0 && answerText.length < 40;
-
-    if (imgUrl) {
-      const img = document.createElement('img');
-      img.src = imgUrl;
-      img.alt = entry.title;
-      img.className = 'answer-img' + (imgOnly ? '' : ' answer-img--with-text');
-      body.appendChild(img);
-    }
-    if (!imgOnly) {
-      const p = document.createElement('p');
-      p.className = 'answer';
-      p.textContent = opts.reveal ? '' : answerText;
-      body.appendChild(p);
-      answerEl = p;
-    }
-
-    const meta = $('output-meta');
-    const more = $('output-more');
-    meta.innerHTML = '';
-    if (entry) {
-      if (imgOnly) meta.appendChild(metaRow('Note', answerText));
-      meta.appendChild(metaRow('Memory', entry.title));
-      meta.appendChild(metaRow('Section', entry.section));
-      meta.appendChild(metaRow('Source', entry.file));
-      meta.classList.remove('hidden');
-      more.classList.remove('hidden');
-      more.onclick = ev => { ev.preventDefault(); openDoc(entry); };
-    } else {
-      meta.classList.add('hidden');
-      more.classList.add('hidden');
-    }
+    setAttached(0);
 
     // new answer enters with a 120ms opacity fade, no sliding
     body.classList.remove('fade-in');
@@ -174,8 +202,16 @@ const UI = (() => {
     updateWires();
   }
 
-  /* ---- typewriter reveal (§4.3): speech-boundary driven (charIndex) with a
-   * uniform fallback pace; the two merge by taking the furthest position.
+  function setAttached(n) {
+    const meta = $('output-meta');
+    meta.innerHTML = '';
+    if (!n) { meta.classList.add('hidden'); return; }
+    meta.appendChild(metaRow('Attached', n + (n === 1 ? ' memory' : ' memories')));
+    meta.classList.remove('hidden');
+  }
+
+  /* ---- typewriter reveal: speech-boundary driven (charIndex) with a uniform
+   * fallback pace; the two merge by taking the furthest position.
    * onEnd → finishReveal shows everything. */
   function startReveal(text, estMs) {
     answerText = text;
@@ -204,30 +240,131 @@ const UI = (() => {
     if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
   }
 
-  /* ---- doc overlay */
-  async function openDoc(entry) {
-    $('doc-label').textContent = LABELS.mem(entry.id);
-    const body = $('doc-body');
-    body.innerHTML = '<p>recalling…</p>';
-    const meta = $('doc-meta');
-    meta.innerHTML = '';
+  /* ---- child nodes: the documents an answer brings out */
+  function buildChild(entry) {
+    const card = document.createElement('section');
+    card.className = 'node child';
+    card.dataset.id = entry.id;
+    card.dataset.round = answerCount;
+
+    const head = document.createElement('header');
+    head.className = 'node__head';
+    const label = document.createElement('span');
+    label.className = 'node__label';
+    label.textContent = LABELS.child(LABELS.out, entry);
+    const close = document.createElement('button');
+    close.className = 'node__close';
+    close.setAttribute('aria-label', 'dismiss');
+    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(card); });
+    head.appendChild(label);
+    head.appendChild(close);
+
+    const preview = document.createElement('div');
+    preview.className = 'node__body child__preview';
+    const p = document.createElement('p');
+    p.className = 'child__excerpt';
+    p.textContent = 'recalling…';
+    preview.appendChild(p);
+    Memory.excerpt(entry).then(t => { p.textContent = t || entry.answer; });
+    Memory.firstImage(entry).then(url => {
+      if (!url) return;
+      const img = document.createElement('img');
+      img.className = 'child__img';
+      img.src = url;
+      img.alt = entry.title;
+      preview.insertBefore(img, p);
+    });
+
+    const doc = document.createElement('div');
+    doc.className = 'node__body child__doc hidden';
+
+    const meta = document.createElement('footer');
+    meta.className = 'node__meta';
     meta.appendChild(metaRow('Memory', entry.title));
     meta.appendChild(metaRow('Section', entry.section));
     meta.appendChild(metaRow('Source', entry.file));
-    $('doc-mask').classList.remove('hidden');
-    $('doc-overlay').classList.remove('hidden');
-    try {
-      const md = await Memory.fetchDoc(entry);
-      body.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
-      body.scrollTop = 0;
-    } catch (err) {
-      body.innerHTML = '<p>(this memory could not be loaded)</p>';
-    }
+
+    const more = document.createElement('a');
+    more.className = 'node__more';
+    more.href = '#';
+    more.textContent = 'See more';
+    more.addEventListener('click', ev => { ev.preventDefault(); toggleChild(card, entry); });
+
+    card.appendChild(head);
+    card.appendChild(preview);
+    card.appendChild(doc);
+    card.appendChild(meta);
+    card.appendChild(more);
+    return card;
   }
 
-  function closeDoc() {
-    $('doc-overlay').classList.add('hidden');
-    $('doc-mask').classList.add('hidden');
+  // See more ↔ See less: the full markdown expands in place, no overlay
+  async function toggleChild(card, entry) {
+    const preview = card.querySelector('.child__preview');
+    const doc = card.querySelector('.child__doc');
+    const more = card.querySelector('.node__more');
+    const expanded = card.classList.toggle('expanded');
+    preview.classList.toggle('hidden', expanded);
+    doc.classList.toggle('hidden', !expanded);
+    more.textContent = expanded ? 'See less' : 'See more';
+    if (expanded && !doc.dataset.loaded) {
+      doc.dataset.loaded = '1';
+      doc.innerHTML = '<p>recalling…</p>';
+      try {
+        const md = await Memory.fetchDoc(entry);
+        doc.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
+        doc.scrollTop = 0;
+      } catch (err) {
+        doc.innerHTML = '<p>(this memory could not be loaded)</p>';
+      }
+    }
+    updateWires();
+  }
+
+  function dismissChild(card) {
+    if (nodeObserver) nodeObserver.unobserve(card);
+    card.remove();
+    setAttached($('children').childElementCount);
+    updateWires();
+  }
+
+  // Esc: cards already out stay, but any expanded one folds back to preview
+  function collapseChildren() {
+    for (const card of $('children').children) {
+      if (!card.classList.contains('expanded')) continue;
+      card.classList.remove('expanded');
+      card.querySelector('.child__preview').classList.remove('hidden');
+      card.querySelector('.child__doc').classList.add('hidden');
+      card.querySelector('.node__more').textContent = 'See more';
+    }
+    updateWires();
+  }
+
+  function cancelSpawn() {
+    spawnGen++;
+    spawnRound = null;
+  }
+
+  // §3.3: previous round's cards leave, then one card per entry appears
+  // (stagger + wire draw-on land with the animation step)
+  async function spawnChildren(entries, round) {
+    const myGen = ++spawnGen;
+    spawnRound = round;
+    const alive = () => myGen === spawnGen && (round === undefined || round === spawnRound);
+    const host = $('children');
+    host.classList.remove('dim');
+    for (const card of [...host.children]) {
+      if (nodeObserver) nodeObserver.unobserve(card);
+      card.remove();
+    }
+    setAttached(entries.length);
+    for (const entry of entries) {
+      if (!alive()) break;
+      const card = buildChild(entry);
+      host.appendChild(card);
+      if (nodeObserver) nodeObserver.observe(card);
+      updateWires();
+    }
   }
 
   /* ---- index overlay */
@@ -291,10 +428,13 @@ const UI = (() => {
     }
   }
 
+  function setNodeObserver(obs) { nodeObserver = obs; }
+
   return {
     setState, setMode, setLastQuery, buildSelfMeta,
     setAnswer, startReveal, revealAnswer, finishReveal,
-    openDoc, closeDoc, showIndex, hideIndex, updateWires
+    spawnChildren, cancelSpawn, collapseChildren,
+    showIndex, hideIndex, updateWires, setNodeObserver
   };
 })();
 
@@ -337,12 +477,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('face:ready', UI.updateWires);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(UI.updateWires);
   const nodeObserver = new ResizeObserver(UI.updateWires);
-  ['node-input', 'node-self', 'node-output'].forEach(id => nodeObserver.observe(document.getElementById(id)));
+  ['node-input', 'node-self', 'node-output', 'children'].forEach(id => nodeObserver.observe(document.getElementById(id)));
+  UI.setNodeObserver(nodeObserver);
   UI.updateWires();
 
   const input = document.getElementById('query');
 
-  // mobile: textarea shrinks to 2 rows (§7)
+  // mobile: textarea shrinks to 2 rows
   const mqMobile = window.matchMedia('(max-width: 699px)');
   const applyRows = () => { input.rows = mqMobile.matches ? 2 : 4; };
   mqMobile.addEventListener('change', applyRows);
@@ -360,7 +501,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   // global keys: Esc closes overlays & stops speech; "/" focuses the input
   window.addEventListener('keydown', ev => {
     if (ev.key === 'Escape') {
-      UI.closeDoc();
       UI.hideIndex();
       Agent.cancel();
       return;
@@ -401,6 +541,4 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('index-overlay').addEventListener('click', ev => {
     if (!ev.target.closest('.node')) UI.hideIndex();
   });
-  document.getElementById('doc-close').addEventListener('click', () => UI.closeDoc());
-  document.getElementById('doc-mask').addEventListener('click', () => UI.closeDoc());
 });

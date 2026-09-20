@@ -52,20 +52,19 @@ body {
 
 .hidden { display: none !important; }
 
-/* ---- the graph: three columns, SELF (tallest) sets the row height */
+/* ---- the graph: node columns + the children column, SELF sets row height */
 #graph {
   position: relative;
   z-index: 2;
-  display: grid;
-  grid-template-columns: auto auto auto;
-  gap: clamp(48px, 6vw, 120px);
+  display: flex;
   align-items: center;
   justify-content: center;
+  gap: clamp(48px, 6vw, 120px);
   min-height: 100vh;
   padding: 5vh 4vw;
 }
 
-/* ---- node skeleton (three nodes, doc overlay, index cards all reuse it) */
+/* ---- node skeleton (three nodes, child nodes, index cards all reuse it) */
 .node {
   position: relative;
   background: var(--card-bg);
@@ -203,25 +202,30 @@ body {
 #output-body img.answer-img { display: block; width: 100%; max-height: 42vh; object-fit: contain; }
 #output-body img.answer-img--with-text { max-height: 28vh; }
 
-/* ---- doc overlay (See more → full memory document) */
-#doc-mask { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 29; }
-#doc-overlay { position: fixed; inset: 6vh 10vw; z-index: 30; }
-.doc-body { overflow-y: auto; font-size: 13px; line-height: 1.65; }
-.doc-body h1, .doc-body h2, .doc-body h3, .doc-body h4, .doc-body h5, .doc-body h6 { margin: 0.9em 0 0.4em; line-height: 1.3; font-weight: 500; }
-.doc-body h1 { font-size: 18px; }
-.doc-body h2 { font-size: 15px; }
-.doc-body h3 { font-size: 14px; }
-.doc-body p { margin: 0.6em 0; }
-.doc-body ul, .doc-body ol { margin: 0.6em 0 0.6em 1.4em; }
-.doc-body a { color: var(--fg); }
-.doc-body code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
-.doc-body pre { background: rgba(255,255,255,0.06); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0.8em 0; }
-.doc-body pre code { padding: 0; background: none; }
-.doc-body img { max-width: 100%; }
-.doc-body hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 1.2em 0; }
-.doc-body table { border-collapse: collapse; margin: 0.8em 0; }
-.doc-body th, .doc-body td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.15); text-align: left; }
-.doc-body blockquote { border-left: 2px solid #ffffff; padding-left: 12px; margin: 0.6em 0; color: var(--fg-2); }
+/* ---- children: documents an answer brings out, as their own node cards */
+#children { display: flex; flex-direction: column; gap: 24px; align-self: center; }
+#children:empty { display: none; }
+#children.dim .child { opacity: var(--card-dim); }
+.child { width: clamp(220px, 20vw, 300px); transition: opacity .12s ease, transform .12s ease, width .2s ease; }
+.child.expanded { width: clamp(300px, 28vw, 420px); }
+.child__img { display: block; width: 100%; max-height: 150px; object-fit: cover; margin-bottom: 8px; }
+.child__excerpt { font-size: var(--fs-text); line-height: 1.5; color: var(--fg-2); }
+.child__doc { max-height: 56vh; overflow-y: auto; font-size: 13px; line-height: 1.65; }
+.child__doc h1, .child__doc h2, .child__doc h3, .child__doc h4, .child__doc h5, .child__doc h6 { margin: 0.9em 0 0.4em; line-height: 1.3; font-weight: 500; }
+.child__doc h1 { font-size: 18px; }
+.child__doc h2 { font-size: 15px; }
+.child__doc h3 { font-size: 14px; }
+.child__doc p { margin: 0.6em 0; }
+.child__doc ul, .child__doc ol { margin: 0.6em 0 0.6em 1.4em; }
+.child__doc a { color: var(--fg); }
+.child__doc code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+.child__doc pre { background: rgba(255,255,255,0.06); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0.8em 0; }
+.child__doc pre code { padding: 0; background: none; }
+.child__doc img { max-width: 100%; }
+.child__doc hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 1.2em 0; }
+.child__doc table { border-collapse: collapse; margin: 0.8em 0; }
+.child__doc th, .child__doc td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.15); text-align: left; }
+.child__doc blockquote { border-left: 2px solid #ffffff; padding-left: 12px; margin: 0.6em 0; color: var(--fg-2); }
 
 /* ---- index overlay (all memories as node cards) */
 #index-overlay {
@@ -289,10 +293,10 @@ body {
 }
 
 @media (max-width: 699px) {
-  #graph { grid-template-columns: 1fr; gap: 32px; padding: 4vh 5vw; }
+  #graph { flex-direction: column; gap: 32px; padding: 4vh 5vw; }
   #node-self { order: 1; }
   #node-output { order: 2; width: auto; }
   #node-input { order: 3; width: auto; position: sticky; bottom: 0; }
+  #children { order: 4; }   /* stopgap: mobile chain order lands in a later step */
   .portrait { height: min(38vh, 320px); }
-  #doc-overlay { inset: 0; border-radius: 0; }
 }

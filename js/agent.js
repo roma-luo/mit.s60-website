@@ -1,19 +1,20 @@
 /* Agent — conversation state machine.
  * idle → listening → thinking → speaking → (showing) → idle
  *
- *   Agent.handle(query)  — a new query interrupts the current round (B4):
- *                          speech stops, the pending doc timer is cleared
- *                          (B3), and the new round starts immediately.
- *   Agent.cancel()       — Esc: same interrupt, then back to idle.
- *   Agent.setState(st)   — drives Face and UI together (§6).
- *   Agent.showEntry(entry) — index card: OUTPUT + doc overlay, no speech (§5.3).
- * busy is reset in try/finally (B2); voice.js additionally carries a
- * watchdog for browsers that never fire SpeechSynthesis onend.
+ *   Agent.handle(query)    — a new query interrupts the current round:
+ *                            speech stops, pending child spawns are
+ *                            cancelled (UI.cancelSpawn), the round starts now.
+ *   Agent.cancel()         — Esc: stop speech + spawning, fold expanded
+ *                            children back to preview, back to idle.
+ *   Agent.setState(st)     — drives Face and UI together.
+ *   Agent.showEntry(entry) — index card: OUTPUT + one child node, no speech.
+ * Answers carry docIds[]; each becomes a child node on the canvas.
+ * busy is reset in try/finally; voice.js additionally carries a watchdog
+ * for browsers that never fire SpeechSynthesis onend.
  */
 const Agent = (() => {
   let busy = false;
   let round = 0;
-  let docTimer = null;
   let interruptResolve = null;
 
   function setState(st) {
@@ -21,18 +22,19 @@ const Agent = (() => {
     UI.setState(st);
   }
 
-  // Supersede whatever is happening: stop speech, cancel the pending doc
-  // overlay (B3), and release any round still awaiting its speech end.
+  // Supersede whatever is happening: stop speech, stop any in-flight child
+  // spawn, and release any round still awaiting its speech end.
   function interrupt() {
     round++;
     Voice.stop();
-    if (docTimer) { clearTimeout(docTimer); docTimer = null; }
+    UI.cancelSpawn();
     if (interruptResolve) { interruptResolve(); interruptResolve = null; }
   }
 
   function cancel() {
     interrupt();
-    UI.finishReveal(); // keep the last answer, fully shown
+    UI.finishReveal();   // keep the last answer, fully shown
+    UI.collapseChildren(); // cards already out stay, expanded ones fold back
     Face.setMouth(0);
     setState('idle');
   }
@@ -41,7 +43,7 @@ const Agent = (() => {
     query = (query || '').trim();
     if (!query) return;
 
-    interrupt(); // B4: interrupt-priority — never silently drop a new query
+    interrupt(); // interrupt-priority — never silently drop a new query
     if (query === '/index') { UI.showIndex(); return; }
 
     busy = true;
@@ -62,23 +64,17 @@ const Agent = (() => {
         try { res = await Brain.answer(query); }
         catch (err) {
           console.error(err);
-          res = { text: "Something went wrong inside my head. Try again." };
+          res = { text: "Something went wrong inside my head. Try again.", docIds: [] };
         }
       }
       if (myRound !== round) return; // superseded while thinking
 
-      // brains now return docIds[]; until child nodes land (next step) only
-      // the first document takes the old overlay path — behavior unchanged
       const entries = (res.docIds || []).map(Memory.byId).filter(Boolean);
-      const entry = entries[0] || null;
       setState('speaking');
-      await UI.setAnswer(res, entry, { reveal: true });
+      await UI.setAnswer(res, { reveal: true });
       UI.startReveal(res.text, res.text.length * 60); // uniform fallback pace;
       // speech boundary events drive revealAnswer ahead of it when available
-
-      // the agent "pulls the document out of its memory" shortly after it
-      // starts speaking; Esc or a new query clears this timer (B3)
-      if (entry) docTimer = setTimeout(() => { docTimer = null; UI.openDoc(entry); }, 900);
+      UI.spawnChildren(entries, myRound); // self-stops if the round is superseded
 
       await Promise.race([
         new Promise(resolve => Voice.speak(res.text, {
@@ -94,22 +90,19 @@ const Agent = (() => {
       Face.setMouth(0);
       setState(entries.length ? 'showing' : 'idle');
     } finally {
-      // B2: error, interrupt or missing onend — the agent never stays busy
-      // and no doc timer outlives its round.
-      if (myRound === round) {
-        if (docTimer) { clearTimeout(docTimer); docTimer = null; }
-        busy = false;
-      }
+      // error, interrupt or missing onend — the agent never stays busy
+      if (myRound === round) busy = false;
     }
   }
 
-  // §5.3: index card picked — update OUTPUT + open the doc, no brain, no speech
+  // index card picked — OUTPUT shows the answer, one child node appears
+  // next to it; no brain, no speech
   async function showEntry(entry) {
     interrupt();
     Face.setMouth(0);
-    await UI.setAnswer({ text: entry.answer, docId: entry.id }, entry);
+    await UI.setAnswer({ text: entry.answer });
+    UI.spawnChildren([entry]);
     setState('showing');
-    UI.openDoc(entry);
   }
 
   return { handle, cancel, setState, showEntry };
