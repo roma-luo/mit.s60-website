@@ -46,6 +46,7 @@ body {
   color: var(--fg);
   font-family: var(--font);
   font-size: var(--fs-text);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 .hidden { display: none !important; }
@@ -272,3 +273,18 @@ body {
   z-index: 15;
 }
 #index-dot:hover { background: #ffffff; }
+
+/* ---- responsive: tablet narrows the portrait, mobile stacks vertically */
+@media (max-width: 1099px) {
+  #graph { gap: 32px; }
+  .portrait { height: min(54vh, 560px); }
+}
+
+@media (max-width: 699px) {
+  #graph { grid-template-columns: 1fr; gap: 32px; padding: 4vh 5vw; }
+  #node-self { order: 1; }
+  #node-output { order: 2; width: auto; }
+  #node-input { order: 3; width: auto; position: sticky; bottom: 0; }
+  .portrait { height: min(48vh, 420px); }
+  #doc-overlay { inset: 0; border-radius: 0; }
+}

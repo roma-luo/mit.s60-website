@@ -80,9 +80,11 @@ const UI = (() => {
   }
 
   /* ---- wires: bezier paths between node edge midpoints (§5.1) */
-  function setWire(name, x1, y1, x2, y2) {
-    const dx = (x2 - x1) * 0.5;
-    $(name).setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+  function setWire(name, x1, y1, x2, y2, vertical) {
+    const d = vertical
+      ? `M ${x1} ${y1} C ${x1} ${y1 + (y2 - y1) * 0.5}, ${x2} ${y2 - (y2 - y1) * 0.5}, ${x2} ${y2}`
+      : `M ${x1} ${y1} C ${x1 + (x2 - x1) * 0.5} ${y1}, ${x2 - (x2 - x1) * 0.5} ${y2}, ${x2} ${y2}`;
+    $(name).setAttribute('d', d);
     const a = $(name + '-a');
     const b = $(name + '-b');
     a.setAttribute('cx', x1); a.setAttribute('cy', y1);
@@ -95,10 +97,15 @@ const UI = (() => {
     const ri = $('node-input').getBoundingClientRect();
     const rs = $('node-self').getBoundingClientRect();
     const ro = $('node-output').getBoundingClientRect();
-    // INPUT right-edge midpoint → SELF left-edge midpoint; SELF → OUTPUT same
-    // (the vertical mobile variant joins in the responsive step)
-    setWire('wire-in', ri.right, ri.top + ri.height / 2, rs.left, rs.top + rs.height / 2);
-    setWire('wire-out', rs.right, rs.top + rs.height / 2, ro.left, ro.top + ro.height / 2);
+    if (window.innerWidth < 700) {
+      // mobile stacks SELF → OUTPUT → INPUT: same bezier, vertical axis (§7)
+      setWire('wire-in', rs.left + rs.width / 2, rs.bottom, ro.left + ro.width / 2, ro.top, true);
+      setWire('wire-out', ro.left + ro.width / 2, ro.bottom, ri.left + ri.width / 2, ri.top, true);
+    } else {
+      // INPUT right-edge midpoint → SELF left-edge midpoint; SELF → OUTPUT same
+      setWire('wire-in', ri.right, ri.top + ri.height / 2, rs.left, rs.top + rs.height / 2);
+      setWire('wire-out', rs.right, rs.top + rs.height / 2, ro.left, ro.top + ro.height / 2);
+    }
   }
 
   /* ---- OUTPUT node */
@@ -328,6 +335,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   UI.updateWires();
 
   const input = document.getElementById('query');
+
+  // mobile: textarea shrinks to 2 rows (§7)
+  const mqMobile = window.matchMedia('(max-width: 699px)');
+  const applyRows = () => { input.rows = mqMobile.matches ? 2 : 4; };
+  mqMobile.addEventListener('change', applyRows);
+  applyRows();
 
   input.addEventListener('keydown', ev => {
     if (ev.key === 'Enter' && !ev.shiftKey) {
