@@ -50,9 +50,7 @@ const Agent = (() => {
     setState('thinking');
     UI.setLastQuery(query);
 
-    const liveBrain = DeepseekBrain.enabled ? DeepseekBrain
-                    : OllamaBrain.enabled ? OllamaBrain
-                    : null;
+    const liveBrain = ApiBrain.enabled ? ApiBrain : null;
     if (liveBrain) {
       try { res = await liveBrain.answer(query); }
       catch (err) {

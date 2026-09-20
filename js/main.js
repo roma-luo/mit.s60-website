@@ -553,15 +553,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  if (OllamaBrain.enabled) {
-    console.info('live brain mode: ollama');
-    Rag.init()
-      .then(() => console.info('vector memory ready (' + Memory.entries.length + ' memories)'))
-      .catch(err => console.warn('vector memory unavailable, agent will use keyword search:', err));
-  }
-  if (DeepseekBrain.enabled) console.info('live brain mode: deepseek (cloud)');
+  if (ApiBrain.enabled) console.info('live brain mode: api (deepseek via /api/chat, recall via /api/recall)');
 
-  UI.setMode(DeepseekBrain.enabled || OllamaBrain.enabled ? 'live' : 'static');
+  UI.setMode(ApiBrain.enabled ? 'live' : 'static');
   UI.buildSelfMeta();
 
   // wires: recompute on resize, font load, video metadata (face:ready), and

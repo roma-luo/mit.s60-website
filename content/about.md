@@ -18,9 +18,9 @@ There is nothing on the screen but a face, because there is nothing on my mind b
 - The face is drawn procedurally on a canvas — blinking, glancing, scratching its head while idle. (A later version may swap in a scanned 3D head or recorded footage; the renderer is a replaceable module.)
 - The voice is the browser's speech synthesis, driving the mouth.
 - The brain has two modes:
-  - **static mode** (default): client-side retrieval over a memory manifest — works on any static host;
-  - **live mode**: append `?brain=ollama` while a local Ollama instance is running, and the same interface is answered by a local LLM with my memories stuffed into its prompt.
-- The memory vault is a folder of markdown files plus a manifest. Everything I submit for this course lives there.
+  - **live mode** (default online): answers come from a cloud model (DeepSeek, via `/api/chat`) that looks memories up through `/api/recall`, a hybrid vector + keyword search over everything written here;
+  - **static mode** (`?brain=static`): client-side keyword retrieval over the memory manifest — works on any static host with no backend.
+- The memory vault is a folder of markdown files; front matter carries the metadata, and the manifest plus the search index are generated at build time. Everything I submit for this course lives there.
 
 ## Why
 

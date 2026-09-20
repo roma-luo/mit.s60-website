@@ -1,8 +1,9 @@
 /* AgentLoop — the shared hand-written tool-calling agent loop.
- * Used by OllamaBrain (local, ?brain=ollama) and DeepseekBrain (cloud,
- * ?brain=deepseek); each brain only supplies its own chat(messages)
- * transport. The harness carries ONLY the persona + tool protocol;
- * all course content lives in memory and the agent retrieves it itself.
+ * Used by ApiBrain (cloud live mode): the brain only supplies its own
+ * chat(messages) transport. The harness carries ONLY the persona + tool
+ * protocol; all course content lives in memory and the agent retrieves it
+ * itself — via /api/recall (hybrid vector + BM25 search) when the API is
+ * reachable, keyword search over the manifest when it is not.
  *
  *   await AgentLoop.answer(query, chat) → { text, docIds: string[] }
  */
@@ -20,7 +21,7 @@ const AgentLoop = (() => {
       "",
       "To act, reply with ONLY one JSON object on a single line:",
       '{"tool": "recall", "query": "<search terms>"} — search your long-term memory',
-      '{"tool": "show", "id": "<memory id>"} — pull that document out for the visitor',
+      '{"tool": "show", "id": "<memory id>"} — pull that document out for the visitor; ids come from the [id: …] tags in recall results',
       "When you have enough to answer, reply in plain text (no JSON).",
       "Recall at least once before answering questions about the course.",
       "If your answer is about a specific memory (a week, a project idea), call show with its id BEFORE giving the plain-text answer.",
@@ -40,9 +41,26 @@ const AgentLoop = (() => {
   }
 
   async function runRecall(q) {
-    const hits = Rag.ready
-      ? await Rag.search(q, 3)
-      : Memory.search(q).slice(0, 3);
+    try {
+      const r = await fetch('/api/recall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q, k: 6 })
+      });
+      const { hits } = r.ok ? await r.json() : { hits: [] };
+      if (hits && hits.length) {
+        return hits.map(h => {
+          const e = Memory.byId(h.docId);
+          return `[id: ${h.docId} | ${e ? e.title : h.docId} > ${h.heading}]\n${h.text}`;
+        }).join('\n---\n');
+      }
+    } catch (e) { /* API unreachable → keyword fallback below */ }
+    return keywordRecall(q);
+  }
+
+  // offline / API-down path: literal keyword search over the manifest
+  async function keywordRecall(q) {
+    const hits = Memory.search(q).slice(0, 3);
     if (!hits.length) return '(nothing found in memory)';
     const parts = [];
     for (const h of hits) {

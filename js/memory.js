@@ -16,11 +16,15 @@ const Memory = (() => {
   const docCache = {};
 
   async function load() {
-    const res = await fetch('content/manifest.json');
-    if (!res.ok) throw new Error('manifest fetch failed: ' + res.status);
-    const data = await res.json();
+    const [mRes, pRes] = await Promise.all([
+      fetch('content/manifest.json'),
+      fetch('content/persona.json')
+    ]);
+    if (!mRes.ok) throw new Error('manifest fetch failed: ' + mRes.status);
+    const data = await mRes.json();
     entries = data.entries;
-    persona = data.persona || {};
+    // persona.json is canonical now; manifest.persona is the legacy fallback
+    persona = pRes.ok ? await pRes.json() : (data.persona || {});
     return entries;
   }
 

@@ -1,18 +1,18 @@
-/* DeepseekBrain — cloud live mode (?brain=deepseek): the AgentLoop with
- * DeepSeek as the model, called through the /api/chat serverless proxy so
- * the key never touches the browser. Retrieval falls back to keyword search
- * (no local embeddings online). Falls back to Brain (static) on failure.
+/* ApiBrain — cloud live mode: the AgentLoop with DeepSeek as the model
+ * (via /api/chat) and /api/recall (hybrid vector + BM25 search over the
+ * build-time index) for retrieval. Falls back to Brain (static) on failure.
  *
- *   DeepseekBrain.enabled
- *   await DeepseekBrain.answer(query) → { text, docIds: string[] }
+ *   ApiBrain.enabled
+ *   await ApiBrain.answer(query) → { text, docIds: string[] }
  */
-const DeepseekBrain = (() => {
-  // B13: on a production hostname (not localhost/127.0.0.1) with no explicit
-  // ?brain= param, default to deepseek — locally the static brain stays default
+const ApiBrain = (() => {
+  // enabled: anything except ?brain=static. No param → production hostnames
+  // default live, localhost stays static (the existing B13 logic).
   const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
-  const hasBrainParam = /(?:\?|&)brain=/.test(location.search);
-  const enabled = /(?:\?|&)brain=deepseek\b/.test(location.search)
-               || (!isLocal && !hasBrainParam);
+  const brainParam = (location.search.match(/(?:\?|&)brain=([\w-]*)/) || [])[1] || null;
+  const enabled = brainParam === 'static' ? false
+                : brainParam ? true
+                : !isLocal;
 
   // a 404/405 from the proxy means this host has no backend at all (e.g.
   // GitHub Pages) — after one such failure, disable for the rest of the
@@ -34,7 +34,7 @@ const DeepseekBrain = (() => {
   }
 
   async function answer(q) {
-    if (disabled) throw new Error('deepseek disabled for session');
+    if (disabled) throw new Error('api brain disabled for session');
     try { return await AgentLoop.answer(q, chat); }
     catch (e) {
       if (/proxy http (404|405)/.test(e.message)) disabled = true;
