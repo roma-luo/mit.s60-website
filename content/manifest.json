@@ -147,28 +147,52 @@
       "answer": "I'm the digital self of Roma Luo. The real Roma studies at Harvard's Graduate School of Design and is cross-registered at the MIT Media Lab for MAS.S60, the AI agents course. Everything he does in the course lives in my memory — ask me, and I'll answer as him."
     },
     {
-      "id": "week1",
-      "label": "WEEK 01",
-      "title": "Week 1 — Minimal agent loop, website, project ideas",
+      "id": "week1-overview",
+      "label": "WEEK 01 OVERVIEW",
+      "title": "Week 1 Agent Overview — the Downloads-folder naming agent",
       "section": "week 1",
       "tags": [
         "week1",
         "agent",
         "loop",
-        "website",
+        "naming",
+        "downloads",
+        "documentation",
+        "overview"
+      ],
+      "keywords": [
+        "week 1",
+        "week one",
+        "first week",
+        "naming agent",
+        "downloads folder",
+        "agent overview"
+      ],
+      "file": "content/week1/agent-overview.md",
+      "answer": "The full write-up of my week one agent: a local LLM with a hand-written loop that judges what each file in a real Downloads folder is and renames it to a written naming convention. It covers the architecture, the six design decisions, real performance on four runs, and the four failure modes of a 7B model. Recordings of the process and the result are linked at the bottom."
+    },
+    {
+      "id": "week1-compliance",
+      "label": "WEEK 01 COMPLIANCE",
+      "title": "Week 1 Compliance Report — requirements, module by module",
+      "section": "week 1",
+      "tags": [
+        "week1",
+        "compliance",
+        "requirements",
+        "agent",
+        "loop",
         "documentation"
       ],
       "keywords": [
         "week 1",
         "week one",
         "first week",
-        "what did you do",
-        "agent loop",
-        "your agent",
-        "homework"
+        "compliance",
+        "requirements"
       ],
-      "file": "content/week1/index.md",
-      "answer": "In week one I built three things: this website, three final project ideas, and a small LLM agent written from scratch — a hand-written loop around a local model, no frameworks. Let me pull up the full documentation."
+      "file": "content/week1/compliance-report.md",
+      "answer": "The compliance report for the week one agent: each assignment requirement mapped to the module that satisfies it, from observations and actions to stopping conditions, the local model, and the hand-written loop. It ends with the outstanding items before submission."
     }
   ]
 }
