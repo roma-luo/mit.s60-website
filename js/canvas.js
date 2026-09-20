@@ -46,7 +46,7 @@ const Canvas = (() => {
 
     el.addEventListener('wheel', ev => {
       if (!enabled()) return;
-      if (ev.target.closest('.child__doc')) return; // let the doc scroll internally
+      if (ev.target.closest('.child__doc') || ev.target.closest('#query')) return; // let these scroll internally
       ev.preventDefault();
       const dx = ev.deltaX || (ev.shiftKey ? ev.deltaY : 0);
       const dy = ev.shiftKey ? 0 : ev.deltaY;

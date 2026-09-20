@@ -9,11 +9,10 @@
  *   Agent.setState(st)     — drives Face and UI together.
  *   Agent.showEntry(entry) — index card: OUTPUT + one child node, no speech.
  * Answers carry docIds[]; each becomes a child node on the canvas.
- * busy is reset in try/finally; voice.js additionally carries a watchdog
- * for browsers that never fire SpeechSynthesis onend.
+ * voice.js carries a watchdog for browsers that never fire SpeechSynthesis
+ * onend, so a round can never wedge mid-speech.
  */
 const Agent = (() => {
-  let busy = false;
   let round = 0;
   let interruptResolve = null;
 
@@ -46,57 +45,51 @@ const Agent = (() => {
     interrupt(); // interrupt-priority — never silently drop a new query
     if (query === '/index') { UI.showIndex(); return; }
 
-    busy = true;
     const myRound = round;
     let res = null;
-    try {
-      setState('thinking');
-      UI.setLastQuery(query);
+    setState('thinking');
+    UI.setLastQuery(query);
 
-      const liveBrain = DeepseekBrain.enabled ? DeepseekBrain
-                      : OllamaBrain.enabled ? OllamaBrain
-                      : null;
-      if (liveBrain) {
-        try { res = await liveBrain.answer(query); }
-        catch (err) {
-          console.warn('live brain failed, falling back to static brain:', err);
-          UI.setMode('static'); // reflect the fallback in the INPUT meta Mode row
-        }
+    const liveBrain = DeepseekBrain.enabled ? DeepseekBrain
+                    : OllamaBrain.enabled ? OllamaBrain
+                    : null;
+    if (liveBrain) {
+      try { res = await liveBrain.answer(query); }
+      catch (err) {
+        console.warn('live brain failed, falling back to static brain:', err);
+        UI.setMode('static'); // reflect the fallback in the INPUT meta Mode row
       }
-      if (!res) {
-        try { res = await Brain.answer(query); }
-        catch (err) {
-          console.error(err);
-          res = { text: "Something went wrong inside my head. Try again.", docIds: [] };
-        }
-      }
-      if (myRound !== round) return; // superseded while thinking
-
-      const entries = (res.docIds || []).map(Memory.byId).filter(Boolean);
-      setState('speaking');
-      await UI.setAnswer(res, { reveal: true });
-      UI.startReveal(res.text, res.text.length * 85); // uniform fallback pace
-      // (~85ms/char ≈ TTS rate); speech boundary events pull revealAnswer to
-      // the exact position when the browser provides them
-      UI.spawnChildren(entries, myRound); // self-stops if the round is superseded
-
-      await Promise.race([
-        new Promise(resolve => Voice.speak(res.text, {
-          onViseme: v => Face.setMouth(v),
-          onBoundary: ({ charIndex }) => UI.revealAnswer(charIndex),
-          onEnd: resolve
-        })),
-        new Promise(resolve => { interruptResolve = resolve; })
-      ]);
-      if (myRound !== round) return; // superseded while speaking
-
-      UI.finishReveal();
-      Face.setMouth(0);
-      setState(entries.length ? 'showing' : 'idle');
-    } finally {
-      // error, interrupt or missing onend — the agent never stays busy
-      if (myRound === round) busy = false;
     }
+    if (!res) {
+      try { res = await Brain.answer(query); }
+      catch (err) {
+        console.error(err);
+        res = { text: "Something went wrong inside my head. Try again.", docIds: [] };
+      }
+    }
+    if (myRound !== round) return; // superseded while thinking
+
+    const entries = (res.docIds || []).map(Memory.byId).filter(Boolean);
+    setState('speaking');
+    await UI.setAnswer(res, { reveal: true });
+    UI.startReveal(res.text, res.text.length * 85); // uniform fallback pace
+    // (~85ms/char ≈ TTS rate); speech boundary events pull revealAnswer to
+    // the exact position when the browser provides them
+    UI.spawnChildren(entries, myRound); // self-stops if the round is superseded
+
+    await Promise.race([
+      new Promise(resolve => Voice.speak(res.text, {
+        onViseme: v => Face.setMouth(v),
+        onBoundary: ({ charIndex }) => UI.revealAnswer(charIndex),
+        onEnd: resolve
+      })),
+      new Promise(resolve => { interruptResolve = resolve; })
+    ]);
+    if (myRound !== round) return; // superseded while speaking
+
+    UI.finishReveal();
+    Face.setMouth(0);
+    setState(entries.length ? 'showing' : 'idle');
   }
 
   // index card picked — OUTPUT shows the answer, one child node appears

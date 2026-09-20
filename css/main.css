@@ -1,6 +1,7 @@
 /* MAS S60 — Digital Self · node-graph edition.
- * Near-black dot-grid background; three node cards (INPUT / SELF / OUTPUT)
- * joined by bezier wires. Palette: black / white / grey + four LED colors. */
+ * Pure black pannable canvas; beveled black node cards (INPUT / SELF /
+ * OUTPUT + child nodes) joined by bezier wires.
+ * Palette: black / white / grey + four LED colors. */
 
 :root {
   /* background: pure black */

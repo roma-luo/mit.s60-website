@@ -4,7 +4,7 @@
  * (no local embeddings online). Falls back to Brain (static) on failure.
  *
  *   DeepseekBrain.enabled
- *   await DeepseekBrain.answer(query) → { text, docId? }
+ *   await DeepseekBrain.answer(query) → { text, docIds: string[] }
  */
 const DeepseekBrain = (() => {
   // B13: on a production hostname (not localhost/127.0.0.1) with no explicit
