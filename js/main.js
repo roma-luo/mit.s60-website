@@ -113,6 +113,27 @@ const UI = (() => {
     setWire($(name), $(name + '-a'), $(name + '-b'), x1, y1, x2, y2, vertical);
   }
 
+  function setWireVisible(name, visible) {
+    const d = visible ? '' : 'none';
+    $(name).style.display = d;
+    $(name + '-a').style.display = d;
+    $(name + '-b').style.display = d;
+  }
+
+  // A4: keep the three main cards optically centered regardless of the
+  // children column — padding-left = max(6vw, (vw − cards − 2 gaps) / 2),
+  // computed on load/resize only, so a child appearing or expanding never
+  // shifts INPUT/SELF/OUTPUT; the graph only extends to the right
+  function centerGraph() {
+    const graph = $('graph');
+    if (window.innerWidth < 700) { graph.style.paddingLeft = ''; return; }
+    const gap = parseFloat(getComputedStyle(graph).columnGap) || 0;
+    const cards = ['node-input', 'node-self', 'node-output']
+      .reduce((sum, id) => sum + $(id).getBoundingClientRect().width, 0);
+    const pad = Math.max(window.innerWidth * 0.06, (window.innerWidth - cards - 2 * gap) / 2);
+    graph.style.paddingLeft = pad + 'px';
+  }
+
   // one wire per child, created on demand and keyed by the child's data-id;
   // a freshly spawned wire draws itself on (dashoffset 1 → 0, 300ms)
   function childWireEls(svg, id, animate) {
@@ -204,15 +225,21 @@ const UI = (() => {
     const rs = rel($('node-self'));
     const ro = rel($('node-output'));
     if (window.innerWidth < 700) {
-      // mobile stacks SELF → OUTPUT → children → INPUT, wires chained vertically
+      // mobile stacks SELF → OUTPUT → children → INPUT; INPUT is a control,
+      // not a node, and never gets a wire (its sticky rect moves on scroll
+      // and there is no scroll listener anymore) — the spine ends at the
+      // last child; with no children, wire-out hides
       setNamedWire('wire-in', rs.l + rs.w / 2, rs.b, ro.l + ro.w / 2, ro.t, true);
       const lastChild = syncChildWires(rel, ro, anim, true);
-      const spine = lastChild || ro; // wire-out leaves from the last child
-      setNamedWire('wire-out', spine.l + spine.w / 2, spine.b, ri.l + ri.w / 2, ri.t, true);
+      setWireVisible('wire-out', !!lastChild);
+      if (lastChild) {
+        setNamedWire('wire-out', ro.l + ro.w / 2, ro.b, lastChild.l + lastChild.w / 2, lastChild.t, true);
+      }
     } else {
       // INPUT right-edge midpoint → SELF left-edge midpoint; SELF → OUTPUT same
       setNamedWire('wire-in', ri.r, ri.t + ri.h / 2, rs.l, rs.t + rs.h / 2);
       setNamedWire('wire-out', rs.r, rs.t + rs.h / 2, ro.l, ro.t + ro.h / 2);
+      setWireVisible('wire-out', true);
       syncChildWires(rel, ro, anim, false);
     }
   }
@@ -495,7 +522,7 @@ const UI = (() => {
     setState, setMode, setLastQuery, buildSelfMeta,
     setAnswer, startReveal, revealAnswer, finishReveal,
     spawnChildren, cancelSpawn, collapseChildren,
-    showIndex, hideIndex, updateWires, setNodeObserver
+    showIndex, hideIndex, updateWires, centerGraph, setNodeObserver
   };
 })();
 
@@ -533,13 +560,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // wires: recompute on resize, font load, video metadata (face:ready), and
   // whenever a node's box changes (panning needs no recompute — canvas space)
-  window.addEventListener('resize', UI.updateWires);
+  window.addEventListener('resize', () => { UI.centerGraph(); UI.updateWires(); });
   document.addEventListener('face:ready', UI.updateWires);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(UI.updateWires);
   const nodeObserver = new ResizeObserver(UI.updateWires);
   ['node-input', 'node-self', 'node-output', 'children'].forEach(id => nodeObserver.observe(document.getElementById(id)));
   UI.setNodeObserver(nodeObserver);
   Canvas.init();
+  UI.centerGraph();
   UI.updateWires();
 
   const input = document.getElementById('query');

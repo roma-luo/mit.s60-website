@@ -76,7 +76,8 @@ body {
   z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;   /* main cards are centered by UI.centerGraph's
+                                    padding-left, so children never shift them */
   gap: clamp(48px, 6vw, 120px);
   width: max-content;
   min-width: 100vw;
