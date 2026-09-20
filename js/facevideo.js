@@ -31,6 +31,7 @@ const FaceVideo = (() => {
     v.playsInline = true;
     v.preload = 'auto';
     v.className = 'face-video';
+    v.addEventListener('loadedmetadata', () => document.dispatchEvent(new CustomEvent('face:ready')));
     container.appendChild(v);
     v.play().catch(() => {});
     return v;

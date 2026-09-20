@@ -36,10 +36,13 @@ const UI = (() => {
     return new URL(entry.file, document.baseURI).href;
   }
 
-  /* ---- state → UI (§6); wires join in a later step */
+  /* ---- state → UI (§6): SELF LED, INPUT Status meta, wire flow, OUTPUT dim */
   function setState(st) {
     $('self-led').dataset.state = st === 'showing' ? 'idle' : st;
     $('input-status').textContent = st === 'showing' ? 'idle' : st;
+    $('wire-in').classList.toggle('flow', st === 'thinking');
+    $('wire-out').classList.toggle('flow', st === 'speaking');
+    $('output-body').classList.toggle('thinking', st === 'thinking');
   }
 
   function setMode(mode) {
@@ -73,6 +76,28 @@ const UI = (() => {
     meta.appendChild(metaRow('Image type', Face === FaceVideo ? 'Video loop' : 'Procedural canvas'));
   }
 
+  /* ---- wires: bezier paths between node edge midpoints (§5.1) */
+  function setWire(name, x1, y1, x2, y2) {
+    const dx = (x2 - x1) * 0.5;
+    $(name).setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+    const a = $(name + '-a');
+    const b = $(name + '-b');
+    a.setAttribute('cx', x1); a.setAttribute('cy', y1);
+    b.setAttribute('cx', x2); b.setAttribute('cy', y2);
+  }
+
+  function updateWires() {
+    const svg = $('wires');
+    svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
+    const ri = $('node-input').getBoundingClientRect();
+    const rs = $('node-self').getBoundingClientRect();
+    const ro = $('node-output').getBoundingClientRect();
+    // INPUT right-edge midpoint → SELF left-edge midpoint; SELF → OUTPUT same
+    // (the vertical mobile variant joins in the responsive step)
+    setWire('wire-in', ri.right, ri.top + ri.height / 2, rs.left, rs.top + rs.height / 2);
+    setWire('wire-out', rs.right, rs.top + rs.height / 2, ro.left, ro.top + ro.height / 2);
+  }
+
   /* ---- OUTPUT node */
   async function setAnswer(res, entry) {
     answerCount++;
@@ -81,6 +106,7 @@ const UI = (() => {
     $('node-output').dataset.label = LABELS.output(answerCount);
 
     const body = $('output-body');
+    body.classList.remove('thinking');
     body.innerHTML = '';
     const p = document.createElement('p');
     p.className = 'answer';
@@ -101,6 +127,7 @@ const UI = (() => {
       meta.classList.add('hidden');
       more.classList.add('hidden');
     }
+    updateWires();
   }
 
   /* ---- doc overlay */
@@ -183,7 +210,7 @@ const UI = (() => {
 
   return {
     setState, setMode, setLastQuery, buildSelfMeta,
-    setAnswer, openDoc, closeDoc, showIndex, hideIndex
+    setAnswer, openDoc, closeDoc, showIndex, hideIndex, updateWires
   };
 })();
 
@@ -218,6 +245,16 @@ window.addEventListener('DOMContentLoaded', async () => {
            : OllamaBrain.enabled ? 'live·ollama'
            : 'static');
   UI.buildSelfMeta();
+
+  // wires: recompute on resize, scroll, font load, video metadata (face:ready),
+  // and whenever a node's box changes
+  window.addEventListener('resize', UI.updateWires);
+  window.addEventListener('scroll', UI.updateWires, { passive: true });
+  document.addEventListener('face:ready', UI.updateWires);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(UI.updateWires);
+  const nodeObserver = new ResizeObserver(UI.updateWires);
+  ['node-input', 'node-self', 'node-output'].forEach(id => nodeObserver.observe(document.getElementById(id)));
+  UI.updateWires();
 
   const input = document.getElementById('query');
 
