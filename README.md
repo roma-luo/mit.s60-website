@@ -18,7 +18,8 @@ python -m http.server 8000
 For the live brain locally, use `vercel dev` so the API routes work, and
 fill `.env` (see `.env.example`) with `DEEPSEEK_API_KEY` (generation, via
 `/api/chat`) and `OPENAI_API_KEY` (embeddings, via `/api/recall`; optional —
-without it recall runs BM25-only).
+without it recall runs BM25-only). For a relay/aggregator OpenAI key, also
+set `OPENAI_BASE_URL` (and optionally `OPENAI_EMBED_MODEL`).
 
 ## Use it
 

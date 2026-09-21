@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tokenize } from '../lib/tokens.js';
+import { embeddingsUrl, embedModel } from '../lib/embed.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -25,7 +26,6 @@ const MANIFEST = path.join(CONTENT, 'manifest.json');
 const INDEX = path.join(CONTENT, 'index.json');
 const CACHE = path.join(CONTENT, '.embed-cache.json');
 
-const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMS = 512;
 const CHUNK_MAX = 1200;
 const CHUNK_OVERLAP = 150;
@@ -142,10 +142,10 @@ const sha1 = s => createHash('sha1').update(s).digest('hex');
 const round5 = v => Math.round(v * 1e5) / 1e5;
 
 async function embedBatch(texts, key) {
-  const res = await fetch('https://api.openai.com/v1/embeddings', {
+  const res = await fetch(embeddingsUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-    body: JSON.stringify({ model: EMBED_MODEL, input: texts, dimensions: EMBED_DIMS })
+    body: JSON.stringify({ model: embedModel(), input: texts, dimensions: EMBED_DIMS })
   });
   if (!res.ok) throw new Error('openai embeddings http ' + res.status + ': ' + (await res.text()).slice(0, 200));
   const data = await res.json();
@@ -181,6 +181,7 @@ async function main() {
     console.warn(`WARNING: OPENAI_API_KEY not set — building BM25-only index (${stale.length} chunks un-embedded). Set it and re-run to add vectors.`);
   } else {
     try {
+      console.log(`embedding via ${new URL(embeddingsUrl()).host} model ${embedModel()}`);
       for (let i = 0; i < stale.length; i += EMBED_BATCH) {
         const batch = stale.slice(i, i + EMBED_BATCH);
         const vecs = await embedBatch(batch.map(c => c.prefixed), key);
@@ -206,7 +207,7 @@ async function main() {
   const df = {};
   for (const c of outChunks) for (const t of Object.keys(c.tf)) df[t] = (df[t] || 0) + 1;
   const index = {
-    model: EMBED_MODEL,
+    model: embedModel(),
     dims: EMBED_DIMS,
     builtAt: new Date().toISOString(),
     chunks: outChunks,
