@@ -4,11 +4,58 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MAS.S60.romaluo</title>
+<style>
+  /* boot v2 critical css: paints on the first frame, before any script */
+  #boot{position:fixed;inset:0;z-index:1000;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;cursor:pointer;transition:opacity .6s ease}
+  #boot.boot--done{opacity:0;pointer-events:none}
+  #boot .boot__name{color:#d4d4d4;font:300 15px/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:.18em;text-transform:uppercase}
+  #boot .boot__bar{width:min(220px,40vw);height:1px;background:rgba(255,255,255,.15)}
+  #boot .boot__bar-fill{display:block;height:100%;width:0;background:rgba(255,255,255,.85);transition:width .25s ease}
+  html[data-boot=off] #boot{display:none!important}
+</style>
+<script>
+  /* boot v2 suppression check — runs before first paint: once per session,
+     and never under ?brain=static */
+  try {
+    if (sessionStorage.getItem('booted') === '1' || /(?:\?|&)brain=static\b/.test(location.search)) {
+      document.documentElement.dataset.boot = 'off';
+    } else {
+      sessionStorage.setItem('booted', '1');
+    }
+  } catch (e) {}
+</script>
 <link rel="icon" type="image/png" href="assets/logo.png">
 <link rel="apple-touch-icon" href="assets/logo.png">
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
+  <div id="boot">
+    <div class="boot__name">mit.s60.romaluo.agent</div>
+    <div class="boot__bar"><span class="boot__bar-fill" id="boot-bar"></span></div>
+  </div>
+  <script>
+    /* boot v2 bootstrap: skip + failsafe, independent of every later script */
+    (function () {
+      var el = document.getElementById('boot');
+      if (!el) return;
+      if (document.documentElement.dataset.boot === 'off') { el.parentNode.removeChild(el); return; }
+      var finished = false;
+      function finish() {
+        if (finished) return;
+        finished = true;
+        window.removeEventListener('keydown', onKey);
+        el.classList.add('boot--done');
+        setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 650);
+      }
+      var onKey = function () { finish(); };
+      window.__bootFinish = finish;
+      el.addEventListener('click', finish);
+      window.addEventListener('keydown', onKey);
+      setTimeout(finish, 20000); // failsafe: never a stuck black screen
+    })();
+  </script>
+  <script src="js/boot.js"></script>
+
   <div id="canvas">
     <svg id="wires" aria-hidden="true">
       <path id="wire-in" class="wire" d=""/>
@@ -79,7 +126,6 @@
   <script src="js/agentloop.js"></script>
   <script src="js/apibrain.js"></script>
   <script src="js/agent.js"></script>
-  <script src="js/boot.js"></script>
   <script src="js/canvas.js"></script>
   <script src="js/main.js"></script>
 </body>

@@ -324,25 +324,6 @@ html, body, * { scrollbar-width: none; }
 /* thinking: previous answer dims (not cleared) until the new one lands */
 #output-body.thinking { opacity: var(--card-dim); }
 
-/* ---- boot sequence overlay (once per session, skippable) */
-#boot {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: #000000;
-  color: var(--fg-2);
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  padding: 8vh 8vw;
-  cursor: pointer;
-  opacity: 1;
-  transition: opacity .5s ease;
-}
-#boot.boot--done { opacity: 0; pointer-events: none; }
-#boot p { margin: 0 0 4px; }
-#boot .boot__name { margin-top: 20px; font-size: 22px; color: var(--fg); letter-spacing: 0.06em; }
-
 /* ---- the only permanent misc UI: 8px dot, bottom-right */
 #index-dot {
   position: fixed;

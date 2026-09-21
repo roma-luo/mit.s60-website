@@ -691,9 +691,6 @@ const UI = (() => {
 })();
 
 window.addEventListener('DOMContentLoaded', async () => {
-  // boot overlay starts immediately; the site initializes beneath it
-  const bootCtl = (typeof Boot !== 'undefined') ? Boot.play() : null;
-
   const portrait = document.getElementById('portrait');
   if (typeof FaceVideo !== 'undefined' && await FaceVideo.available()) {
     Face = FaceVideo; // swap point: video loops replace the procedural face
@@ -708,11 +705,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     await Memory.load();
   } catch (err) {
     console.error(err);
-    if (bootCtl) bootCtl.abort();
     outputBody.innerHTML = '<p class="placeholder">my memory failed to load — serve this folder over http (see README)</p>';
     return;
   }
-  if (bootCtl) bootCtl.count(Memory.entries.length);
 
   if (ApiBrain.enabled) console.info('live brain mode: api (deepseek via /api/chat, recall via /api/recall)');
 

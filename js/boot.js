@@ -1,65 +1,60 @@
-/* Boot — terminal-style entry sequence, once per browser session, skippable.
- *   Boot.play() → { count(n), abort() } | null (suppressed this session)
- * Lines appear ~90ms apart; the name line holds ~350ms; the overlay fades
- * (.5s) and is removed. Click / any key / Esc jumps straight to the fade.
- * Suppressed when sessionStorage.booted is set or ?brain=static is used.
- * The site renders beneath normally while it plays. */
+/* Boot v2 — real loading progress for the entry overlay. The overlay's
+ * markup, critical CSS, suppression check and skip/failsafe bootstrap are
+ * INLINE in index.html, so it paints on the first frame even if every later
+ * script errors. This file only preloads the real assets (fully, so they
+ * land in HTTP cache) and advances the bar honestly: width = done/total,
+ * failed assets advance too, a 6s progress stall still finishes, minimum
+ * on-screen time ~900ms. Self-starts at parse time.
+ *
+ *   Boot.play() → {} | null (suppressed)
+ */
 const Boot = (() => {
-  const NAME = 'mit.s60.romaluo.agent';
-
-  function suppressed() {
-    try {
-      if (sessionStorage.getItem('booted') === '1') return true;
-    } catch (e) { /* storage blocked: play anyway */ }
-    return /(?:\?|&)brain=static\b/.test(location.search);
-  }
+  const ASSETS = [
+    'content/manifest.json',
+    'content/persona.json',
+    'content/index.json',
+    'assets/logo.png',
+    'assets/idle.mp4',
+    'assets/talking.mp4'
+  ];
+  const MIN_MS = 900;
+  const STALL_MS = 6000;
 
   function play() {
-    if (suppressed()) return null;
-    try { sessionStorage.setItem('booted', '1'); } catch (e) {}
-
-    const el = document.createElement('div');
-    el.id = 'boot';
-    document.body.appendChild(el);
-
-    const state = { n: null, skipped: false };
-    el.addEventListener('click', () => { state.skipped = true; });
-    const onKey = () => { state.skipped = true; };
-    window.addEventListener('keydown', onKey);
-
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const rest = async ms => { // skip-aware sleep
-      const t0 = Date.now();
-      while (!state.skipped && Date.now() - t0 < ms) await sleep(20);
+    const el = document.getElementById('boot');
+    if (!el || document.documentElement.dataset.boot === 'off') return null;
+    const bar = document.getElementById('boot-bar');
+    const t0 = Date.now();
+    let done = 0;
+    let stall = null;
+    const finish = () => { if (window.__bootFinish) window.__bootFinish(); };
+    const rearm = () => {
+      if (stall) clearTimeout(stall);
+      stall = setTimeout(finish, STALL_MS); // no progress for 6s → never hang
     };
-    const addLine = (text, cls) => {
-      const p = document.createElement('p');
-      if (cls) p.className = cls;
-      p.textContent = text;
-      el.appendChild(p);
-    };
+    rearm();
 
-    (async () => {
-      addLine('> harness: online');
-      await rest(90);
-      while (state.n === null && !state.skipped) await sleep(30); // Memory.load in flight
-      if (!state.skipped) addLine('> memory: ' + state.n + ' entries indexed');
-      await rest(90);
-      if (!state.skipped) addLine('> retrieval: hybrid rrf');
-      await rest(90);
-      if (!state.skipped) addLine(NAME, 'boot__name');
-      await rest(350);                             // hold on the name line
-      window.removeEventListener('keydown', onKey);
-      el.classList.add('boot--done');              // fade via CSS opacity .5s
-      await sleep(500);
-      el.remove();
-    })();
-
-    return {
-      count(n) { state.n = n; },
-      abort() { if (state.n === null) state.n = 0; state.skipped = true; }
+    const advance = () => {
+      done += 1;
+      if (bar) bar.style.width = Math.round((done / ASSETS.length) * 100) + '%';
+      rearm();
     };
+    const jobs = ASSETS.map(u =>
+      fetch(u)
+        .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })
+        .catch(() => null)          // a failed asset still advances the bar
+        .then(advance)
+    );
+    Promise.all(jobs).then(() => {
+      if (stall) clearTimeout(stall);
+      const wait = Math.max(0, MIN_MS - (Date.now() - t0));
+      setTimeout(finish, wait);
+    });
+    return {};
   }
 
   return { play };
 })();
+
+// preloading starts before any later script runs
+Boot.play();
