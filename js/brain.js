@@ -10,7 +10,7 @@ const Brain = (() => {
   const canned = [
     {
       match: /^(hi|hello|hey|yo|greetings|good\s(morning|afternoon|evening))\b/i,
-      text: () => "Hey. I am the digital self of " + Memory.persona.name + ". Everything he has done in this course lives in me as memory. Ask me about a specific week, or about the final project ideas — or type /index to see everything I know."
+      text: () => "I am Roma. Everything I did in this course is in my memory. Ask."
     },
     {
       match: /everything|all (your )?memor|what (do|don't) you know|show (me )?all/i,

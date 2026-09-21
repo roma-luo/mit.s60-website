@@ -1,4 +1,4 @@
-/* Face — procedural 2D canvas face ("Delamain-style" digital self).
+/* Face — procedural 2D canvas face (fallback renderer).
  *
  * Public API (swap point for a future 3D / video renderer):
  *   Face.init(canvasElement)
