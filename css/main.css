@@ -78,9 +78,8 @@ body {
 html, body, * { scrollbar-width: none; }
 ::-webkit-scrollbar { display: none; }
 
-/* ---- the canvas: the layer that gets translate()d / scale()d */
+/* ---- the canvas: the layer that gets translate()d / scale()d every frame */
 #canvas { position: absolute; left: 0; top: 0; will-change: transform; transform-origin: 0 0; cursor: grab; }
-#canvas.zooming { transition: transform .45s ease; }   /* only programmatic zoom/reset eases; drags stay immediate */
 #canvas.panning { cursor: grabbing; }
 #canvas .node { cursor: auto; }
 
