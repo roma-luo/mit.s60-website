@@ -1,14 +1,15 @@
-/* Canvas — pannable, auto-fitting workspace.
- * Drag empty space to pan, wheel to pan (deltaY → y, deltaX / shift+wheel → x),
- * double-click empty space to ease back to a fitted view. Whenever the graph
- * is about to overflow the viewport, the whole canvas smoothly zooms out
- * instead — transform: translate(x, y) scale(s), transform-origin: 0 0,
- * never above 1, floored at 0.45; whatever still overflows at the floor is
- * handled by pan/reveal. Disabled under 700px (mobile: native scroll).
+/* Canvas — pannable, zoomable, auto-fitting workspace.
+ * Drag empty space to pan, wheel to zoom IN/OUT around the cursor (~1.1× per
+ * notch, clamped [0.3, 2.5]), double-click empty space to ease back to a
+ * fitted view. When the graph is about to overflow the viewport the canvas
+ * smoothly zooms out instead — transform: translate(x, y) scale(s), origin
+ * 0 0, floored at 0.45 for auto-fit, and auto-fit only ever shrinks (a
+ * manual zoom-out is never undone). Whatever still overflows at the floor
+ * is handled by pan/reveal. Disabled under 700px (mobile: native scroll).
  *
  *   Canvas.init()
  *   Canvas.pan(dx, dy)
- *   Canvas.fit(animate)        — recompute the auto-fit scale and re-clamp
+ *   Canvas.fit(animate)        — shrink-only auto-fit + re-clamp
  *   Canvas.reveal(el)          — minimal pan that brings el into view
  *   Canvas.setOffset(x, y, animate)
  *   Canvas.get() → { x, y, scale }
@@ -56,9 +57,16 @@ const Canvas = (() => {
       if (!enabled()) return;
       if (ev.target.closest('.child__doc') || ev.target.closest('#query')) return; // let these scroll internally
       ev.preventDefault();
-      const dx = ev.deltaX || (ev.shiftKey ? ev.deltaY : 0);
-      const dy = ev.shiftKey ? 0 : ev.deltaY;
-      set(ox - dx, oy - dy, scale, false);
+      // wheel = zoom to cursor, not pan. Normalize line-mode (Firefox) and
+      // pixel deltas (trackpads send fractions): ~1.1× per notch, clamped.
+      const notch = ev.deltaMode === 1 ? ev.deltaY : ev.deltaY / 100;
+      const next = Math.min(2.5, Math.max(0.3, scale * Math.pow(1.1, -notch)));
+      if (next === scale) return;
+      // keep the canvas-space point under the pointer fixed on screen:
+      // ox' = mx - (mx - ox) * (s'/s)
+      const mx = ev.clientX;
+      const my = ev.clientY;
+      set(mx - (mx - ox) * (next / scale), my - (my - oy) * (next / scale), next, false);
     }, { passive: false });
 
     el.addEventListener('dblclick', ev => {
@@ -127,7 +135,11 @@ const Canvas = (() => {
 
   function fit(animate) {
     if (!enabled()) return;
-    set(ox, oy, fitScale(), animate);
+    const target = fitScale();
+    // shrink-only: zoom out when content would overflow at the user's current
+    // scale, but NEVER force the scale back up after a manual zoom-out
+    if (target < scale) set(ox, oy, target, animate);
+    else set(ox, oy, scale, animate); // fits already: just re-clamp the offset
   }
 
   function pan(dx, dy) { set(ox + dx, oy + dy, scale, false); }
