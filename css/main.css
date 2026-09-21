@@ -74,6 +74,10 @@ body {
 
 .hidden { display: none !important; }
 
+/* no visible scrollbar UI anywhere (scroll stays where structurally needed) */
+html, body, * { scrollbar-width: none; }
+::-webkit-scrollbar { display: none; }
+
 /* ---- the canvas: the layer that gets translate()d / scale()d */
 #canvas { position: absolute; left: 0; top: 0; will-change: transform; transform-origin: 0 0; cursor: grab; }
 #canvas.zooming { transition: transform .45s ease; }   /* only programmatic zoom/reset eases; drags stay immediate */
@@ -257,7 +261,9 @@ body {
 .child__video { display: block; width: 100%; max-height: 180px; background: #0a0a0a; }
 .child__attach { display: block; width: 100%; max-height: 200px; object-fit: contain; background: #0a0a0a; }
 .child__excerpt { font-size: var(--fs-text); line-height: 1.5; color: var(--fg-2); }
-.child__doc { max-height: 56vh; overflow-y: auto; font-size: 13px; line-height: 1.65; }
+/* expanded doc: no internal scrollbar, the card grows with its content;
+ * collapsed = height 0 (inline), the height transition reflows siblings */
+.child__doc { overflow: hidden; transition: height .4s ease; font-size: 13px; line-height: 1.65; }
 .child__doc h1, .child__doc h2, .child__doc h3, .child__doc h4, .child__doc h5, .child__doc h6 { margin: 0.9em 0 0.4em; line-height: 1.3; font-weight: 500; }
 .child__doc h1 { font-size: 18px; }
 .child__doc h2 { font-size: 15px; }

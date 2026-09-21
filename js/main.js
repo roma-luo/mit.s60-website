@@ -484,28 +484,60 @@ const UI = (() => {
     return card;
   }
 
-  // See more ↔ See less: the full markdown expands in place, no overlay
+  // See more ↔ See less: the full markdown expands in place, no overlay and
+  // no internal scrollbar — the card grows as tall as its content while a
+  // height animation reflows the siblings below it gradually
   async function toggleChild(card, entry) {
     const preview = card.querySelector('.child__preview');
     const doc = card.querySelector('.child__doc');
     const more = card.querySelector('.node__more');
-    const expanded = card.classList.toggle('expanded');
-    preview.classList.toggle('hidden', expanded);
-    doc.classList.toggle('hidden', !expanded);
-    more.textContent = expanded ? 'See less' : 'See more';
-    if (expanded && !doc.dataset.loaded) {
-      doc.dataset.loaded = '1';
-      doc.innerHTML = '<p>recalling…</p>';
-      try {
-        const md = await Memory.fetchDoc(entry);
-        doc.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
-        doc.scrollTop = 0;
-      } catch (err) {
-        doc.innerHTML = '<p>(this memory could not be loaded)</p>';
+    const expanding = !card.classList.contains('expanded');
+
+    if (expanding) {
+      if (!doc.dataset.loaded) {
+        doc.dataset.loaded = '1';
+        doc.innerHTML = '<p>recalling…</p>';
+        try {
+          const md = await Memory.fetchDoc(entry);
+          doc.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
+        } catch (err) {
+          doc.innerHTML = '<p>(this memory could not be loaded)</p>';
+        }
       }
+      card.classList.add('expanded');
+      preview.classList.add('hidden');
+      more.textContent = 'See less';
+      animateHeight(doc, true);
+    } else {
+      card.classList.remove('expanded');
+      preview.classList.remove('hidden');
+      more.textContent = 'See more';
+      animateHeight(doc, false);
     }
-    updateWires();
-    if (typeof Canvas !== 'undefined') Canvas.fit(true);
+  }
+
+  // height 0 ↔ content height over ~400ms (CSS transition on .child__doc);
+  // wires and auto-fit track the animation every frame, then height settles
+  // to auto (expanded) or the doc hides again (collapsed)
+  function animateHeight(doc, expanding) {
+    doc.classList.remove('hidden');
+    const target = expanding ? doc.scrollHeight : 0;
+    doc.style.height = (expanding ? 0 : doc.scrollHeight) + 'px';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      doc.style.height = target + 'px';
+      const t0 = performance.now();
+      const tick = () => {
+        updateWires();
+        if (typeof Canvas !== 'undefined') Canvas.fit(true);
+        if (performance.now() - t0 < 450) requestAnimationFrame(tick);
+        else {
+          if (expanding) doc.style.height = 'auto';
+          else { doc.style.height = ''; doc.classList.add('hidden'); }
+          updateWires();
+        }
+      };
+      requestAnimationFrame(tick);
+    }));
   }
 
   function dismissChild(card) {
@@ -522,7 +554,9 @@ const UI = (() => {
       if (!card.classList.contains('expanded')) continue;
       card.classList.remove('expanded');
       card.querySelector('.child__preview').classList.remove('hidden');
-      card.querySelector('.child__doc').classList.add('hidden');
+      const doc = card.querySelector('.child__doc');
+      doc.style.height = '';
+      doc.classList.add('hidden');
       card.querySelector('.node__more').textContent = 'See more';
     }
     updateWires();
