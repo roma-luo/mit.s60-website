@@ -39,8 +39,10 @@ const Brain = (() => {
       };
     }
     const top = hits[0].score;
-    // several memories scoring close together → fan them all out
-    const tied = hits.filter(h => h.score >= Math.max(2, top * 0.6)).slice(0, 3);
+    // several memories scoring close together → fan them all out, in
+    // manifest order (they are definitionally equally relevant)
+    const tied = hits.filter(h => h.score >= Math.max(2, top * 0.6)).slice(0, 3)
+      .sort((a, b) => Memory.entries.indexOf(a.entry) - Memory.entries.indexOf(b.entry));
     if (tied.length > 1) {
       return {
         text: "I found " + tied.length + " memories that fit. Here they are.",

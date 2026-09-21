@@ -26,8 +26,14 @@ const LABELS = {
   output: n => 'S60-OUT-' + String(n).padStart(2, '0'),
   child: (outLabel, entry) => outLabel + '-' + Memory.label(entry),
   video: (entry, att) => LABELS.out + '-' + Memory.label({ title: entry.section }) + ' · ' + attachmentLabel(att),
+  // image attachments: parent doc label + the filename's last hyphen token
+  // ("idea-1-diagram.jpg" → "S60-OUT-FINAL IDEA 01 · DIAGRAM")
+  attach: (entry, att) => LABELS.child(LABELS.out, entry) + ' · '
+    + att.split('/').pop().replace(/\.[^.]*$/, '').split('-').pop().toUpperCase(),
   mem: id => 'S60-MEM-' + String(id).toUpperCase()
 };
+
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp'];
 
 const UI = (() => {
   const $ = id => document.getElementById(id);
@@ -382,6 +388,56 @@ const UI = (() => {
     return card;
   }
 
+  // route attachments by extension: images get an image card, everything
+  // else keeps the video card
+  function buildAttachmentChild(entry, att) {
+    const ext = ((att.match(/\.([a-z0-9]+)$/i) || [])[1] || '').toLowerCase();
+    if (IMAGE_EXTS.includes(ext)) return buildImageChild(entry, att, ext);
+    return buildVideoChild(entry, att);
+  }
+
+  // image attachments (jpg/png/webp) spawn a plain image card, no See more
+  function buildImageChild(entry, att, ext) {
+    const dir = entry.file.split('/').slice(0, -1).join('/');
+    const url = new URL(att, new URL(entry.file, document.baseURI)).href;
+
+    const card = document.createElement('section');
+    card.className = 'node child child--image';
+    card.dataset.id = entry.id + '#' + att;
+    card.dataset.round = answerCount;
+
+    const head = document.createElement('header');
+    head.className = 'node__head';
+    const label = document.createElement('span');
+    label.className = 'node__label';
+    label.textContent = LABELS.attach(entry, att);
+    const close = document.createElement('button');
+    close.className = 'node__close';
+    close.setAttribute('aria-label', 'dismiss');
+    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(card); });
+    head.appendChild(label);
+    head.appendChild(close);
+
+    const body = document.createElement('div');
+    body.className = 'node__body';
+    const img = document.createElement('img');
+    img.className = 'child__attach';
+    img.src = url;
+    img.alt = entry.title;
+    body.appendChild(img);
+
+    const meta = document.createElement('footer');
+    meta.className = 'node__meta';
+    meta.appendChild(metaRow('Memory', entry.title));
+    meta.appendChild(metaRow('Type', 'image/' + (ext === 'jpg' ? 'jpeg' : ext)));
+    meta.appendChild(metaRow('Source', dir + '/' + att));
+
+    card.appendChild(head);
+    card.appendChild(body);
+    card.appendChild(meta);
+    return card;
+  }
+
   // one small video card per attachment, spawned right after its parent doc
   // card; the URL resolves against the parent doc's own directory
   function buildVideoChild(entry, att) {
@@ -517,7 +573,7 @@ const UI = (() => {
       // doc card first, then one card per attachment — docs and videos are
       // separate budgets (attachments don't count toward the show-id cap)
       const cards = [buildChild(entry)];
-      for (const att of entry.attachments || []) cards.push(buildVideoChild(entry, att));
+      for (const att of entry.attachments || []) cards.push(buildAttachmentChild(entry, att));
       for (const card of cards) {
         if (!alive()) break;
         if (last) await delay(220);

@@ -1,18 +1,17 @@
 ---
 id: fp-1
 label: FINAL IDEA 01
-title: Idea 1 — A Personal Agent That Remembers and Predicts
+title: Idea 1 — Hippocampus+
 section: final project
-answer: Idea one: a personal agent that remembers and predicts. It observes how you actually work, your real task durations and abandoned goals, and makes simple predictions, like warning that a task will take you three hours, not one. Each prediction is later checked against reality so it improves over time. It augments honest self-memory: it shows you patterns about yourself that you cannot see alone.
+answer: Idea one: Hippocampus Plus. An organ that extends the mind. It logs only the moments when a belief is formed, changed, or abandoned, each node versioned. Its key capability: recalling your past self. You were just as certain three years ago, so why did the view change.
 tags: [final, project, idea, proposal, memory, prediction, planning, behavior]
-keywords: [idea 1, first idea, project idea one, remembers and predicts, personal agent, planning mistakes, deadlines, self memory]
+keywords: [idea 1, first idea, project idea one, remembers and predicts, personal agent, planning mistakes, deadlines, self memory, hippocampus, beliefs, past self]
+attachments: [idea-1-diagram.jpg]
 ---
-# Final Project Idea 1: A Personal Agent That Remembers and Predicts
+I. Hippocampus+
 
-**Who it is for:** Students and knowledge workers who keep repeating the same planning mistakes — missing deadlines, underestimating tasks, forgetting commitments.
+An organ that extends the mind, helping humans understand the timeline of thought formation.
 
-**The problem:** Humans are bad at remembering their own behavior accurately. We forget how long things actually took us, and we underestimate the same tasks again and again. The data exists in our calendars, notes, and to-do lists, but nobody reviews it.
-
-**How an agent could help:** An agent that observes your daily data (tasks, calendar, notes), builds a memory of how you actually behave, and uses it to make simple predictions — "this task will probably take you 3 hours, not 1" or "you usually abandon goals like this by week two." Each prediction is later checked against reality, so the agent improves over time.
-
-**What it augments:** Honest self-memory and self-awareness. It doesn't do your work — it shows you patterns about yourself that you can't see on your own.
+Data Sources: Your conversations, writing, decision-making records, and things you’ve read and reacted to. It does not record everything; it only logs events at the moments when “a belief is formed, changed, or abandoned.”
+Data Structure: Beliefs serve as nodes, not notes. Each node has a version history: when it was formed, what evidence it was based on, when it was modified, and what triggered the change. “My view on X” is a node with three versions: 2022, 2024, and 2026.
+Key Capability: The ability to recall “my past self.” If you’re very certain about something now, it can tell you: you were just as certain about a similar issue three years ago—so why did your view change?
