@@ -80,7 +80,9 @@ hand-written agent loop (no frameworks):
    ```
 
    Every field is optional: `id` defaults to the file slug, `label`/`title`/
-   `answer` are derived from the document.
+   `answer` are derived from the document. Optional `attachments: [file.mp4]`
+   (paths relative to the doc) spawn small playable video cards next to the
+   document's card.
 2. Run `npm run build:index` (or just push — Vercel runs it as the build
    command). This regenerates `content/manifest.json` **and** the search
    index `content/index.json` (chunks + vectors when `OPENAI_API_KEY` is

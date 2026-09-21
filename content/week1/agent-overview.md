@@ -6,6 +6,7 @@ section: week 1
 answer: The full write-up of my week one agent: a local LLM with a hand-written loop that judges what each file in a real Downloads folder is and renames it to a written naming convention. It covers the architecture, the six design decisions, real performance on four runs, and the four failure modes of a 7B model. Recordings of the process and the result are linked at the bottom.
 tags: [week1, agent, loop, naming, downloads, documentation, overview]
 keywords: [week 1, week one, first week, naming agent, downloads folder, agent overview]
+attachments: [recording-process.mp4, recording-outcome.mp4]
 ---
 # Week 1 Agent Overview: The Downloads-Folder Naming Agent
 

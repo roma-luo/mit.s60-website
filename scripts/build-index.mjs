@@ -80,7 +80,7 @@ export async function buildEntries() {
     const { data: fm, body } = parseFrontMatter(await readFile(abs, 'utf8'));
     const title = fm.title || (body.match(/^#\s+(.*)$/m) || [])[1] || rel;
     const tags = fm.tags || [];
-    entries.push({
+    const entry = {
       id: fm.id || rel.replace(/\.md$/, ''),
       label: fm.label || deriveLabel(title),
       title,
@@ -89,7 +89,11 @@ export async function buildEntries() {
       keywords: fm.keywords || tags,
       file: 'content/' + rel,
       answer: fm.answer || firstParagraph(body)
-    });
+    };
+    // attachments (recordings etc.) pass through; URLs resolve against the
+    // doc's own directory at display time
+    if (fm.attachments && fm.attachments.length) entry.attachments = fm.attachments;
+    entries.push(entry);
   }
   entries.sort((a, b) => a.file.localeCompare(b.file));
   return entries;

@@ -9,12 +9,23 @@
  * no overlays or masks; "See more" expands a child card in place.
  */
 
+// attachment label from the filename: strip extension, split on '-', drop a
+// leading "recording" token, uppercase the rest + RECORDING
+// ("recording-process.mp4" → "PROCESS RECORDING")
+function attachmentLabel(att) {
+  const stem = att.split('/').pop().replace(/\.[^.]*$/, '');
+  const parts = stem.split('-');
+  if (parts[0] && parts[0].toLowerCase() === 'recording') parts.shift();
+  return (parts.join(' ').toUpperCase() + ' RECORDING').trim();
+}
+
 const LABELS = {
   input: 'S60-IN',
   self: 'S60-SELF',
   out: 'S60-OUT',
   output: n => 'S60-OUT-' + String(n).padStart(2, '0'),
   child: (outLabel, entry) => outLabel + '-' + Memory.label(entry),
+  video: (entry, att) => LABELS.out + '-' + Memory.label({ title: entry.section }) + ' · ' + attachmentLabel(att),
   mem: id => 'S60-MEM-' + String(id).toUpperCase()
 };
 
@@ -371,6 +382,52 @@ const UI = (() => {
     return card;
   }
 
+  // one small video card per attachment, spawned right after its parent doc
+  // card; the URL resolves against the parent doc's own directory
+  function buildVideoChild(entry, att) {
+    const dir = entry.file.split('/').slice(0, -1).join('/');
+    const url = new URL(att, new URL(entry.file, document.baseURI)).href;
+    const ext = (att.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+
+    const card = document.createElement('section');
+    card.className = 'node child child--video';
+    card.dataset.id = entry.id + '#' + att;
+    card.dataset.round = answerCount;
+
+    const head = document.createElement('header');
+    head.className = 'node__head';
+    const label = document.createElement('span');
+    label.className = 'node__label';
+    label.textContent = LABELS.video(entry, att);
+    const close = document.createElement('button');
+    close.className = 'node__close';
+    close.setAttribute('aria-label', 'dismiss');
+    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(card); });
+    head.appendChild(label);
+    head.appendChild(close);
+
+    const body = document.createElement('div');
+    body.className = 'node__body';
+    const video = document.createElement('video');
+    video.className = 'child__video';
+    video.controls = true;
+    video.preload = 'metadata';
+    video.playsInline = true;
+    video.src = url;
+    body.appendChild(video);
+
+    const meta = document.createElement('footer');
+    meta.className = 'node__meta';
+    meta.appendChild(metaRow('Memory', entry.title));
+    meta.appendChild(metaRow('Type', ext ? 'video/' + ext.toLowerCase() : 'video'));
+    meta.appendChild(metaRow('Source', dir + '/' + att));
+
+    card.appendChild(head);
+    card.appendChild(body);
+    card.appendChild(meta);
+    return card;
+  }
+
   // See more ↔ See less: the full markdown expands in place, no overlay
   async function toggleChild(card, entry) {
     const preview = card.querySelector('.child__preview');
@@ -447,11 +504,7 @@ const UI = (() => {
     setAttached(entries.length);
 
     let last = null;
-    for (const entry of entries) {
-      if (!alive()) break;
-      if (last) await delay(220);
-      if (!alive()) break;
-      const card = buildChild(entry);
+    const spawnOne = card => {
       card.classList.add('entering');
       host.appendChild(card);
       if (nodeObserver) nodeObserver.observe(card);
@@ -459,6 +512,19 @@ const UI = (() => {
       updateWires(true);
       if (typeof Canvas !== 'undefined') Canvas.fit(true); // zoom out before the column overflows
       last = card;
+    };
+    for (const entry of entries) {
+      // doc card first, then one card per attachment — docs and videos are
+      // separate budgets (attachments don't count toward the show-id cap)
+      const cards = [buildChild(entry)];
+      for (const att of entry.attachments || []) cards.push(buildVideoChild(entry, att));
+      for (const card of cards) {
+        if (!alive()) break;
+        if (last) await delay(220);
+        if (!alive()) break;
+        spawnOne(card);
+      }
+      if (!alive()) break;
     }
     if (last && alive() && typeof Canvas !== 'undefined') Canvas.reveal(last);
   }
