@@ -717,7 +717,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // wires: recompute on resize, font load, video metadata (face:ready), and
   // whenever a node's box changes (panning needs no recompute — canvas space)
-  window.addEventListener('resize', () => { UI.centerGraph(); Canvas.fit(true); UI.updateWires(); });
+  window.addEventListener('resize', () => { UI.centerGraph(); UI.updateWires(); });
   document.addEventListener('face:ready', UI.updateWires);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(UI.updateWires);
   const nodeObserver = new ResizeObserver(UI.updateWires);
