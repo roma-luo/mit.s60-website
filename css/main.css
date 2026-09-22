@@ -79,7 +79,7 @@ html, body, * { scrollbar-width: none; }
 ::-webkit-scrollbar { display: none; }
 
 /* ---- the canvas: the layer that gets translate()d / scale()d every frame */
-#canvas { position: absolute; left: 0; top: 0; will-change: transform; transform-origin: 0 0; cursor: grab; }
+#canvas { position: absolute; left: 0; top: 0; will-change: transform; transform-origin: 0 0; cursor: grab; backface-visibility: hidden; }
 #canvas.panning { cursor: grabbing; }
 #canvas .node { cursor: auto; }
 
@@ -252,7 +252,7 @@ html, body, * { scrollbar-width: none; }
 #children { display: flex; flex-direction: column; gap: 24px; align-self: center; }
 #children:empty { display: none; }
 #children.dim .child { opacity: var(--card-dim); }
-.child { width: clamp(220px, 20vw, 300px); transition: opacity .12s ease, transform .12s ease, width .2s ease, border-color .3s ease, box-shadow .3s ease; }
+.child { width: clamp(220px, 20vw, 300px); transition: opacity .12s ease, transform .12s ease, border-color .3s ease, box-shadow .3s ease; }
 .child.entering { opacity: 0; transform: translateX(-8px); }
 .child.leaving { opacity: 0; }
 .child.expanded { width: clamp(300px, 28vw, 420px); }
