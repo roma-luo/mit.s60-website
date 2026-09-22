@@ -16,6 +16,7 @@
   --card-rim-hi: rgba(255,255,255,0.34);    /* top-edge highlight */
   --card-groove: rgba(0,0,0,0.85);          /* groove inside the rim */
   --card-radius: 8px;
+  --head-h: 30px;
   --card-shadow:
     inset 0 1px 0 var(--card-rim-hi),
     inset 0 -1px 0 rgba(255,255,255,0.05),
@@ -256,13 +257,29 @@ html, body, * { scrollbar-width: none; }
 .child.entering { opacity: 0; transform: translateX(-8px); }
 .child.leaving { opacity: 0; }
 .child.expanded { width: clamp(300px, 28vw, 420px); }
+
+/* expand / collapse choreography: the card's width+height are animated by
+ * WAAPI (see main.js MOTION); the outgoing block leaves the flow and sits
+ * under the header as an overlay so the incoming block owns the layout */
+.child.animating { will-change: width, height; }
+.child.animating .child__preview,
+.child.animating .child__doc { will-change: opacity, transform; }
+.child.animating--expand .child__preview,
+.child.animating--collapse .child__doc {
+  position: absolute;
+  top: var(--head-h);
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.node__more { transition: opacity .08s linear; }
 .child__img { display: block; width: 100%; max-height: 150px; object-fit: cover; margin-bottom: 8px; }
 .child__video { display: block; width: 100%; max-height: 180px; background: #0a0a0a; }
 .child__attach { display: block; width: 100%; max-height: 200px; object-fit: contain; background: #0a0a0a; }
 .child__excerpt { font-size: var(--fs-text); line-height: 1.5; color: var(--fg-2); }
 /* expanded doc: no internal scrollbar, the card grows with its content;
  * collapsed = height 0 (inline), the height transition reflows siblings */
-.child__doc { overflow: hidden; transition: height .4s ease; font-size: 13px; line-height: 1.65; }
+.child__doc { overflow: hidden; font-size: 13px; line-height: 1.65; }
 .child__doc h1, .child__doc h2, .child__doc h3, .child__doc h4, .child__doc h5, .child__doc h6 { margin: 0.9em 0 0.4em; line-height: 1.3; font-weight: 500; }
 .child__doc h1 { font-size: 18px; }
 .child__doc h2 { font-size: 15px; }
