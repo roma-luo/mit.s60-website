@@ -517,8 +517,8 @@ const UI = (() => {
   }
 
   // height 0 ↔ content height over ~400ms (CSS transition on .child__doc);
-  // wires and auto-fit track the animation every frame, then height settles
-  // to auto (expanded) or the doc hides again (collapsed)
+  // wires track the animation every frame, then height settles to auto
+  // (expanded) or the doc hides again (collapsed)
   function animateHeight(doc, expanding) {
     doc.classList.remove('hidden');
     const target = expanding ? doc.scrollHeight : 0;
@@ -528,12 +528,13 @@ const UI = (() => {
       const t0 = performance.now();
       const tick = () => {
         updateWires();
-        if (typeof Canvas !== 'undefined') Canvas.fit(true);
         if (performance.now() - t0 < 450) requestAnimationFrame(tick);
         else {
           if (expanding) doc.style.height = 'auto';
           else { doc.style.height = ''; doc.classList.add('hidden'); }
           updateWires();
+          // bring the card into view without touching the user's zoom
+          if (typeof Canvas !== 'undefined') Canvas.reveal(doc.closest('.child'));
         }
       };
       requestAnimationFrame(tick);
