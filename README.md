@@ -47,6 +47,8 @@ set `OPENAI_BASE_URL` (and optionally `OPENAI_EMBED_MODEL`).
   locally it stays the static brain. `?brain=static` forces the static,
   no-network mode anywhere. If the live brain fails it silently falls back
   to static (and disables itself for the session on hosts with no backend).
+- Desktop: mouse wheel zooms, trackpad two-finger pans, pinch zooms, drag empty
+  space to pan, double-click empty space (or `0`) to re-fit, `+`/`-` to zoom.
 
 ## Live brain mode (cloud API agent loop)
 
