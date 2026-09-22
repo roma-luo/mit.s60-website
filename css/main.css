@@ -124,7 +124,7 @@ html, body, * { scrollbar-width: none; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 30px;
+  height: var(--head-h);
   padding: 0 10px;
   background: var(--card-head-face);
   border-bottom: 1px solid rgba(0,0,0,0.9);           /* groove between head and body */

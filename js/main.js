@@ -558,6 +558,8 @@ const UI = (() => {
     const incoming = expanding ? doc : preview;
 
     // 1. start size = whatever is on screen right now (handles interrupts)
+    const led = card.querySelector('.node__led');
+    if (led) led.dataset.state = 'thinking';
     const s0 = renderedSize(card);
     cancelCardAnims(card);
 
@@ -607,6 +609,8 @@ const UI = (() => {
     cancelCardAnims(card);
     card.classList.remove('animating', 'animating--expand', 'animating--collapse');
     card.querySelector(expanding ? '.child__preview' : '.child__doc').classList.add('hidden');
+    const led = card.querySelector('.node__led');
+    if (led) led.dataset.state = 'idle';
     updateWires();
     if (!expanding && typeof Canvas !== 'undefined') Canvas.fit(true); // shrink-only
   }
