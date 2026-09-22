@@ -484,61 +484,131 @@ const UI = (() => {
     return card;
   }
 
-  // See more ↔ See less: the full markdown expands in place, no overlay and
-  // no internal scrollbar — the card grows as tall as its content while a
-  // height animation reflows the siblings below it gradually
+  const MOTION = {
+    expand:   { size: 440, out: 140, inDelay: 120, ease: 'cubic-bezier(0.32, 0.72, 0, 1)' },
+    collapse: { size: 360, out: 120, inDelay: 100, ease: 'cubic-bezier(0.32, 0.72, 0, 1)' },
+    stagger: 40,
+    easeOut: 'cubic-bezier(0, 0, 0.2, 1)',
+    easeIn:  'cubic-bezier(0.4, 0, 1, 1)'
+  };
+
+  const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // current rendered size (mid-animation aware): computed style reflects the
+  // running WAAPI values, offset* would report the layout target instead
+  function renderedSize(card) {
+    const cs = getComputedStyle(card);
+    return { w: parseFloat(cs.width), h: parseFloat(cs.height) };
+  }
+
+  function cancelCardAnims(card) {
+    for (const a of card.getAnimations({ subtree: true })) a.cancel();
+  }
+
+  // "See more" ↔ "See less": fade out, swap text at the midpoint, fade in
+  function swapLabel(el, text, delay, reduced) {
+    if (reduced) { el.textContent = text; return; }
+    setTimeout(() => {
+      el.style.opacity = '0';
+      setTimeout(() => { el.textContent = text; el.style.opacity = ''; }, 80);
+    }, delay);
+  }
+
+  // See more ↔ See less. FLIP: measure start size, switch the DOM to the
+  // final state, measure end size, then animate the CARD's width+height
+  // between them while preview/doc cross-fade in place. Interruptible: a
+  // click mid-animation reverses from the current rendered size.
   async function toggleChild(card, entry) {
     const preview = card.querySelector('.child__preview');
     const doc = card.querySelector('.child__doc');
     const more = card.querySelector('.node__more');
     const expanding = !card.classList.contains('expanded');
 
-    if (expanding) {
-      if (!doc.dataset.loaded) {
-        doc.dataset.loaded = '1';
-        doc.innerHTML = '<p>recalling…</p>';
-        try {
-          const md = await Memory.fetchDoc(entry);
-          doc.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
-        } catch (err) {
-          doc.innerHTML = '<p>(this memory could not be loaded)</p>';
-        }
+    if (expanding && !doc.dataset.loaded) {
+      doc.dataset.loaded = '1';
+      more.textContent = '…';
+      try {
+        const md = await Memory.fetchDoc(entry);
+        doc.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
+        await settleImages(doc);
+      } catch (err) {
+        doc.innerHTML = '<p>(this memory could not be loaded)</p>';
       }
-      card.classList.add('expanded');
-      preview.classList.add('hidden');
-      more.textContent = 'See less';
-      animateHeight(doc, true);
-    } else {
-      card.classList.remove('expanded');
-      preview.classList.remove('hidden');
       more.textContent = 'See more';
-      animateHeight(doc, false);
     }
+    return runChildTransition(card, expanding, 0);
   }
 
-  // height 0 ↔ content height over ~400ms (CSS transition on .child__doc);
-  // wires track the animation every frame, then height settles to auto
-  // (expanded) or the doc hides again (collapsed)
-  function animateHeight(doc, expanding) {
+  // images that arrive after the end-size measurement would make the card
+  // grow again after the animation; wait (briefly) for them first
+  function settleImages(root) {
+    const imgs = [...root.querySelectorAll('img')].filter(i => !i.complete);
+    if (!imgs.length) return Promise.resolve();
+    const all = Promise.all(imgs.map(i => i.decode ? i.decode().catch(() => {}) : new Promise(r => { i.onload = i.onerror = r; })));
+    return Promise.race([all, new Promise(r => setTimeout(r, 300))]);
+  }
+
+  function runChildTransition(card, expanding, delay) {
+    const preview = card.querySelector('.child__preview');
+    const doc = card.querySelector('.child__doc');
+    const more = card.querySelector('.node__more');
+    const reduced = reducedMotion();
+    const M = expanding ? MOTION.expand : MOTION.collapse;
+    const outgoing = expanding ? preview : doc;
+    const incoming = expanding ? doc : preview;
+
+    // 1. start size = whatever is on screen right now (handles interrupts)
+    const s0 = renderedSize(card);
+    cancelCardAnims(card);
+
+    // 2. final DOM state: both blocks visible, outgoing overlaid via CSS
+    card.classList.remove('animating--expand', 'animating--collapse');
+    card.classList.add('animating', expanding ? 'animating--expand' : 'animating--collapse');
+    card.classList.toggle('expanded', expanding);
+    preview.classList.remove('hidden');
     doc.classList.remove('hidden');
-    const target = expanding ? doc.scrollHeight : 0;
-    doc.style.height = (expanding ? 0 : doc.scrollHeight) + 'px';
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      doc.style.height = target + 'px';
-      const t0 = performance.now();
-      const tick = () => {
-        updateWires();
-        if (performance.now() - t0 < 450) requestAnimationFrame(tick);
-        else {
-          if (expanding) doc.style.height = 'auto';
-          else { doc.style.height = ''; doc.classList.add('hidden'); }
-          updateWires();
-          // bring the card into view without touching the user's zoom
-          if (typeof Canvas !== 'undefined') Canvas.reveal(doc.closest('.child'));
-        }
-      };
-      requestAnimationFrame(tick);
-    }));
+
+    // 3. end size, from real layout
+    const s1 = { w: card.offsetWidth, h: card.offsetHeight };
+
+    // 4. canvas glides to the FINAL footprint while the card grows
+    if (expanding && typeof Canvas !== 'undefined') Canvas.reveal(card);
+
+    if (reduced) {
+      finishChildTransition(card, expanding);
+      more.textContent = expanding ? 'See less' : 'See more';
+      return Promise.resolve();
+    }
+
+    // 5. tracks
+    const size = card.animate(
+      [{ width: s0.w + 'px', height: s0.h + 'px' }, { width: s1.w + 'px', height: s1.h + 'px' }],
+      { duration: M.size, delay, easing: M.ease, fill: 'both' }
+    );
+    outgoing.animate(
+      [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: `translateY(${expanding ? -6 : 6}px)` }],
+      { duration: M.out, delay, easing: MOTION.easeIn, fill: 'both' }
+    );
+    incoming.animate(
+      [{ opacity: 0, transform: `translateY(${expanding ? 8 : -6}px)` }, { opacity: 1, transform: 'translateY(0)' }],
+      { duration: M.size - M.inDelay, delay: delay + M.inDelay, easing: MOTION.easeOut, fill: 'both' }
+    );
+    swapLabel(more, expanding ? 'See less' : 'See more', delay + (expanding ? 60 : 40), false);
+
+    return size.finished.then(
+      () => finishChildTransition(card, expanding),
+      () => {} // cancelled by an interrupt: the new run owns cleanup
+    );
+  }
+
+  // hand the size back to layout (no fill left behind), hide the outgoing
+  // block, and let wires / canvas settle on the real geometry
+  function finishChildTransition(card, expanding) {
+    cancelCardAnims(card);
+    card.classList.remove('animating', 'animating--expand', 'animating--collapse');
+    card.querySelector(expanding ? '.child__preview' : '.child__doc').classList.add('hidden');
+    updateWires();
+    if (!expanding && typeof Canvas !== 'undefined') Canvas.fit(true); // shrink-only
   }
 
   function dismissChild(card) {
@@ -549,19 +619,15 @@ const UI = (() => {
     if (typeof Canvas !== 'undefined') Canvas.fit(true);
   }
 
-  // Esc: cards already out stay, but any expanded one folds back to preview
+  // Esc: cards already out stay, but any expanded one folds back to preview,
+  // staggered top → bottom
   function collapseChildren() {
+    let i = 0;
     for (const card of $('children').children) {
       if (!card.classList.contains('expanded')) continue;
-      card.classList.remove('expanded');
-      card.querySelector('.child__preview').classList.remove('hidden');
-      const doc = card.querySelector('.child__doc');
-      doc.style.height = '';
-      doc.classList.add('hidden');
-      card.querySelector('.node__more').textContent = 'See more';
+      runChildTransition(card, false, Math.min(i, 3) * MOTION.stagger);
+      i++;
     }
-    updateWires();
-    if (typeof Canvas !== 'undefined') Canvas.fit(true);
   }
 
   function cancelSpawn() {
