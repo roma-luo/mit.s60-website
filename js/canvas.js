@@ -268,10 +268,11 @@ const Canvas = (() => {
       h = Math.max(h, child.offsetTop + child.offsetHeight);
     }
     const cs = getComputedStyle(graph);
-    return {
-      w: w + (parseFloat(cs.paddingRight) || 0),
-      h: h + (parseFloat(cs.paddingBottom) || 0)
-    };
+    const pl = parseFloat(cs.paddingLeft) || 0;
+    const pr = parseFloat(cs.paddingRight) || 0;
+    const pb = parseFloat(cs.paddingBottom) || 0;
+    // content only: the centering padding-left is not content
+    return { w: w - pl + pr, h: h + pb };
   }
 
   function fitScale() {
@@ -301,9 +302,10 @@ const Canvas = (() => {
   // glide to the fitted view, centred in the viewport
   function home(animate) {
     const s = fitScale();
-    const GW = graph.offsetWidth * s, GH = graph.offsetHeight * s;
-    const x = (window.innerWidth - GW) / 2 - graph.offsetLeft * s;
-    const y = (window.innerHeight - GH) / 2 - graph.offsetTop * s;
+    const cs = contentSize();
+    const pl = parseFloat(getComputedStyle(graph).paddingLeft) || 0;
+    const x = (window.innerWidth - cs.w * s) / 2 - (graph.offsetLeft + pl) * s;
+    const y = (window.innerHeight - cs.h * s) / 2 - graph.offsetTop * s;
     retarget(x, y, s, animate === false);
   }
 
