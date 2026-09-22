@@ -32,6 +32,26 @@
       "answer": "This site is Roma Luo on the web: his face, his voice, his memory. Ask about the course and it answers from memory, pulling the relevant documents out as cards."
     },
     {
+      "id": "ai-disclosure",
+      "label": "AI DISCLOSURE",
+      "title": "AI use disclosure",
+      "section": "meta",
+      "tags": [
+        "ai",
+        "disclosure",
+        "policy",
+        "transparency"
+      ],
+      "keywords": [
+        "ai",
+        "disclosure",
+        "policy",
+        "transparency"
+      ],
+      "file": "content/ai-disclosure.md",
+      "answer": "My AI use disclosure. I used an AI assistant to guide the coding of the agent and this site, under my direction. All code was reviewed and tested locally by me, and I can explain every component of the submission."
+    },
+    {
       "id": "fp-1",
       "label": "FINAL IDEA 01",
       "title": "Idea 1 — Hippocampus+",
