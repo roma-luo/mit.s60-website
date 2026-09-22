@@ -753,6 +753,12 @@ window.addEventListener('DOMContentLoaded', async () => {
       Agent.cancel();
       return;
     }
+    // zoom / home shortcuts (desktop only, never while typing)
+    if (!/^(TEXTAREA|INPUT)$/.test(ev.target.tagName) && window.innerWidth >= 700) {
+      if (ev.key === '=' || ev.key === '+') { ev.preventDefault(); Canvas.zoomBy(1.2); return; }
+      if (ev.key === '-' || ev.key === '_') { ev.preventDefault(); Canvas.zoomBy(1 / 1.2); return; }
+      if (ev.key === '0') { ev.preventDefault(); Canvas.home(true); return; }
+    }
     if (ev.key === '/' && !ev.metaKey && !ev.ctrlKey &&
         !/^(TEXTAREA|INPUT)$/.test(ev.target.tagName)) {
       ev.preventDefault();
