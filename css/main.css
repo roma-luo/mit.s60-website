@@ -1,76 +1,105 @@
-/* MAS S60 — Digital Self · node-graph edition.
- * Pure black pannable canvas; beveled black node cards (INPUT / SELF /
- * OUTPUT + child nodes) joined by bezier wires.
- * Palette: black / white / grey + four LED colors. */
+/* MAS S60 — Digital Self · node-board edition.
+ * Design system ported from the node-board handoff (DESIGN.md):
+ * beveled black chassis with masked rims, dark text wells, full-pill
+ * buttons, free windows on a pannable/zoomable board. Ground #0a0a0a so
+ * the cast shadows have something to darken.
+ *
+ * R3: never promote layers — no will-change/transform3d on the canvas or
+ * windows, so zoomed text is re-rasterised and stays sharp. */
 
 :root {
-  /* background: pure black */
-  --bg: #000000;
-  --grid-dot: rgba(255,255,255,0.14);
-  --grid-size: 96px;
+  --bg: #0a0a0a;
 
-  /* cards: beveled black capsule material — face, rim, groove, inner vignette */
-  --card-face: radial-gradient(120% 90% at 50% 0%, #1c1c1c 0%, #0e0e0e 55%, #070707 100%);
-  --card-head-face: linear-gradient(180deg, #232323 0%, #121212 100%);
-  --card-rim: rgba(255,255,255,0.14);       /* base ring */
-  --card-rim-hi: rgba(255,255,255,0.34);    /* top-edge highlight */
-  --card-groove: rgba(0,0,0,0.85);          /* groove inside the rim */
+  /* card material: beveled black (sampled from the pre-order button).
+     the lit face lives in --card-head-face, the 1px ring opacity in --gloss */
+  --gloss: 1;
+
+  --card-face:
+    linear-gradient(0deg,
+      rgba(255,255,255,0.130) 0px,
+      rgba(255,255,255,0.075) 12px,
+      rgba(255,255,255,0.025) 30px,
+      rgba(255,255,255,0.000) 54px),
+    radial-gradient(120% 90% at 50% 0%, #1c1c1c 0%, #0e0e0e 55%, #070707 100%);
+
+  --card-head-face: linear-gradient(180deg,
+    #090909 0px, #090909 1px,
+    #5c5c5c 2px, #4e4e4e 5px,
+    #262626 12px, #181818 22px, #111111 100%);
+
+  --card-rim: linear-gradient(180deg,
+    rgba(255,255,255,0.55) 0px,
+    rgba(255,255,255,0.14) 2px,
+    rgba(255,255,255,0.07) 45%,
+    rgba(255,255,255,0.09) 90%,
+    rgba(255,255,255,0.26) 100%);
+
+  --card-groove: rgba(0,0,0,0.85);
   --card-radius: 8px;
-  --head-h: 30px;
   --card-shadow:
-    inset 0 1px 0 var(--card-rim-hi),
-    inset 0 -1px 0 rgba(255,255,255,0.05),
     inset 0 0 0 1px var(--card-groove),
     inset 0 0 22px rgba(0,0,0,0.65),
+    0 0 18px rgba(0,0,0,0.85),
+    0 10px 24px -6px rgba(0,0,0,0.95),
     0 18px 50px rgba(0,0,0,0.6);
-  --card-shadow-active: var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.08);
-  --card-shadow-pressed: inset 0 2px 8px rgba(0,0,0,0.9), inset 0 0 0 1px var(--card-groove);
-  --card-dim: 0.28;           /* opacity of dimmed / unfocused cards */
-
-  /* pills: same material recipe, proportioned for ~26px-tall buttons */
-  --pill-shadow:
-    inset 0 1px 0 var(--card-rim-hi),
-    inset 0 -1px 0 rgba(255,255,255,0.04),
-    inset 0 0 0 1px var(--card-groove),
-    inset 0 0 6px rgba(0,0,0,0.45),
-    0 4px 12px rgba(0,0,0,0.5);
-
-  /* labels: uppercase, tracked-out, light grey (not pure white) */
-  --label-color: #d4d4d4;
-  --label-tracking: 0.18em;
+  --card-shadow-lift: var(--card-shadow), 0 36px 70px -14px rgba(0,0,0,0.95);
 
   /* text */
   --fg: #ffffff;
-  --fg-2: rgba(255,255,255,0.72);   /* metadata labels */
-  --fg-3: rgba(255,255,255,0.45);   /* hints, placeholders */
-  --font: "Helvetica Neue", "HelveticaNeue-Light", "Helvetica Light", Helvetica, Arial, sans-serif;
-  --fs-head: 12px;   /* title bar */
-  --fs-body: 10px;   /* metadata rows */
-  --fs-text: 11px;   /* answer body */
+  --fg-3: rgba(255,255,255,0.45);
+  --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --fw: 400;
+  --fs-head: 11px;
+  --fs-body: 10px;
+  --label-color: #d4d4d4;
+  --label-tracking: 0.18em;
+  --head-h: 30px;
 
-  /* status LEDs (title-bar dots) */
+  /* status lights (idle + agent states; drag uses white + glow) */
   --led-idle: #d9d9d9;
   --led-listening: #ff4d4d;
   --led-thinking: #ffb020;
   --led-speaking: #37d67a;
 
+  /* control button (sampled from the REC reference) */
+  --btn-h: 26px;
+  --btn-radius: 999px;
+  --btn-face: linear-gradient(180deg, #171717 0px, #131313 9px, #080808 100%);
+  --btn-rim: linear-gradient(180deg,
+    rgba(255,255,255,0.35) 0px,
+    rgba(255,255,255,0.06) 2px,
+    rgba(255,255,255,0.04) 60%,
+    rgba(255,255,255,0.23) 100%);
+  --btn-dot: #7b7b7b;
+
+  /* text well */
+  --well-bg: #060606;
+  --well-fg: rgba(255,255,255,0.80);
+  --well-recess: rgba(0,0,0,0.95);
+  --well-radius: 6px;
+  --well-pad: 15px;
+  --fs-well: 10.5px;
+  --lh-well: 1.72;
+  --well-fade: 46px;
+
+  /* short text */
+  --fs-well-short: 14px;
+  --lh-well-short: 1.45;
+
   /* wires */
-  --wire: rgba(255,255,255,0.9);
-  --wire-w: 1.25px;
-  --wire-dot: 3px;
+  --wire: rgba(255,255,255,0.88);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html, body { width: 100%; height: 100%; overflow: hidden; }   /* desktop: no native scroll, the canvas pans */
+html, body { height: 100%; overflow: hidden; }
 
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font);
-  font-size: var(--fs-text);
-  font-weight: 300;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  font-weight: var(--fw);
+  overscroll-behavior: none;
 }
 
 .hidden { display: none !important; }
@@ -79,106 +108,86 @@ body {
 html, body, * { scrollbar-width: none; }
 ::-webkit-scrollbar { display: none; }
 
-/* ---- the canvas: the layer that gets translate()d / scale()d every frame */
-#canvas { position: absolute; left: 0; top: 0; will-change: transform; transform-origin: 0 0; cursor: grab; backface-visibility: hidden; }
-#canvas.panning { cursor: grabbing; }
-#canvas .node { cursor: auto; }
-
-/* ---- the graph: node columns + the children column, SELF sets row height */
-#graph {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;   /* main cards are centered by UI.centerGraph's
-                                    padding-left, so children never shift them */
-  gap: clamp(48px, 6vw, 120px);
-  width: max-content;
-  min-width: 100vw;
-  min-height: 100vh;
-  padding: 5vh 6vw;
-}
-
-/* ---- node skeleton (three nodes, child nodes, index cards all reuse it) */
+/* ============================ the chassis ============================ */
 .node {
   position: relative;
+  width: 340px;
   background: var(--card-face);
-  border: 1px solid var(--card-rim);
+  border: 1px solid transparent;
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow);
-  color: var(--fg);
-  font-family: var(--font);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: border-color .3s ease, box-shadow .3s ease;
 }
-/* focused card / ComfyUI-style running module: the rim brightens */
-.node.active,
-.node:focus-within {
-  border-color: rgba(255,255,255,0.28);
-  box-shadow: var(--card-shadow-active);
+/* the 1px rim, painted as a masked ring so the border box keeps its size */
+.node::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--card-rim);
+  opacity: var(--gloss);
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 
 .node__head {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   height: var(--head-h);
   padding: 0 10px;
   background: var(--card-head-face);
-  border-bottom: 1px solid rgba(0,0,0,0.9);           /* groove between head and body */
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22),   /* the head's own top highlight */
-              0 1px 0 rgba(255,255,255,0.05);         /* faint reflection below */
+  border-bottom: 1px solid rgba(0,0,0,0.9);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06);
 }
 .node__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--label-color);
-  font-weight: 300;
-  font-size: 11px;
+  font-size: var(--fs-head);
+  font-weight: var(--fw);
   letter-spacing: var(--label-tracking);
-  text-transform: uppercase;
+  text-transform: lowercase;
 }
 .node__led {
+  flex: none;
   width: 9px;
   height: 9px;
   border-radius: 50%;
   background: var(--led-idle);
-  transition: background .2s;
+  transition: background 200ms ease, box-shadow 200ms ease;
 }
 .node__led[data-state="empty"] { background: var(--fg-3); }
+.node__led[data-state="listening"] { background: var(--led-listening); }
+.node__led[data-state="thinking"] { background: var(--led-thinking); animation: led-pulse 1s ease-in-out infinite; }
+.node__led[data-state="speaking"] { background: var(--led-speaking); }
+@keyframes led-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-.node__body { padding: 10px; flex: 1; min-height: 0; }
-.node__meta { padding: 6px 10px 3px; font-size: var(--fs-body); line-height: 1.6; }
-.meta-row span { color: var(--fg-3); margin-right: .4em; }
-.meta-row b { font-weight: 400; color: var(--label-color); }
-/* See more / See less links are capsule pills, left-aligned in their row */
-.node__more { align-self: flex-start; margin: 8px 10px 12px; }
+.node__body { padding: 10px; }
 
-/* ---- capsule buttons: the same beveled material as the cards */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 999px;
-  padding: 7px 16px;
-  background: var(--card-face);
-  border: 1px solid var(--card-rim);
-  box-shadow: var(--pill-shadow);
-  color: var(--label-color);
-  font-family: var(--font);
-  font-size: 10px;
-  font-weight: 300;
-  letter-spacing: var(--label-tracking);
-  text-transform: uppercase;
-  text-decoration: none;
-  cursor: pointer;
-  transition: border-color .15s, color .15s, box-shadow .1s;
+.node__meta {
+  display: flex;
+  align-items: flex-end;          /* button bottom flush with the last meta line */
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px 10px;
+  font-size: var(--fs-body);
+  line-height: 1.6;
 }
-.pill:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
-.pill:active { box-shadow: var(--card-shadow-pressed); }
+.meta-row span { color: var(--fg-3); margin-right: .4em; }
+.meta-row b { color: var(--label-color); font-weight: var(--fw); }
 
-/* close control for overlay nodes: 9px dot, × on hover */
-.node__close { position: relative; width: 16px; height: 16px; background: none; border: none; cursor: pointer; }
+/* close control on spawned child windows: 9px dot, × on hover */
+.node__close { position: relative; width: 16px; height: 16px; background: none; border: none; cursor: pointer; flex: none; }
 .node__close::before {
   content: '';
   position: absolute;
@@ -197,8 +206,149 @@ html, body, * { scrollbar-width: none; }
   text-align: center;
 }
 
-/* ---- INPUT (left) */
-#node-input { width: clamp(190px, 17vw, 250px); }
+/* ============================ the button ============================ */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--btn-h);
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--btn-radius);
+  background: var(--btn-face);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.9),
+              0 1px 0 rgba(0,0,0,0.55);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: var(--fw);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--label-color);
+  cursor: pointer;
+  transition: background 160ms ease, box-shadow 120ms ease, transform 90ms ease;
+}
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--btn-rim);
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.btn__label {
+  display: inline-block;
+  min-width: 65px;      /* the wider label (collapse, 64px) — pill must not resize */
+  text-align: center;
+}
+.btn__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--btn-dot);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.35);
+  transition: background 240ms ease, box-shadow 240ms ease;
+}
+.btn:hover { --btn-face: linear-gradient(180deg, #202020 0px, #1a1a1a 9px, #0d0d0d 100%); background: var(--btn-face); }
+.btn:active {
+  background: linear-gradient(180deg, #090909 0px, #101010 100%);
+  box-shadow: inset 0 2px 4px -1px rgba(0,0,0,0.9),
+              inset 0 0 0 1px rgba(0,0,0,0.9);
+  transform: translateY(0.5px);
+}
+.btn:active::before { opacity: 0.35; }
+.btn:focus-visible { outline: 1px solid rgba(255,255,255,0.35); outline-offset: 2px; }
+/* expanded state: the dot lights up with a glow */
+.btn.is-open .btn__dot {
+  background: var(--led-idle);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.35), 0 0 6px rgba(217,217,217,0.35);
+}
+
+/* ============================ image window ============================ */
+.node--image .node__body { padding: 10px; }
+.portrait {
+  position: relative;
+  aspect-ratio: 848 / 1280;
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+.portrait img,
+.portrait canvas,
+.portrait .face-video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;            /* uniform scale, fills the frame, never stretched */
+  object-position: 50% 50%;
+  pointer-events: none;
+}
+.portrait canvas { position: relative; }
+.portrait .face-video { opacity: 0; transition: opacity .35s ease; }
+.portrait .face-video.front { opacity: 1; }
+/* the recess has to sit ABOVE the photo, or the image paints over it */
+.portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.9),
+              inset 0 3px 6px -2px rgba(0,0,0,0.45);
+  pointer-events: none;
+}
+
+/* ============================ text wells ============================ */
+.well {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--well-radius);
+  overflow: hidden;
+  background: var(--well-bg);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.9),
+              inset 0 5px 12px -3px var(--well-recess),
+              inset 0 -1px 0 rgba(255,255,255,0.07),
+              0 1px 0 rgba(255,255,255,0.10);
+}
+.well__text {
+  height: 100%;
+  padding: var(--well-pad);
+  font-size: var(--fs-well);
+  line-height: var(--lh-well);
+  letter-spacing: 0.005em;
+  color: var(--well-fg);
+  overflow: hidden;
+}
+.well__text p + p { margin-top: calc(var(--fs-well) * var(--lh-well) * 0.6); }
+.well__text .placeholder { color: var(--fg-3); }
+/* the clipped text runs out under a fade at the bottom of the well */
+.well::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: var(--well-fade);
+  background: linear-gradient(180deg, transparent 0%, var(--well-bg) 85%);
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+.well.is-open::after { opacity: 0; }
+.well.is-open { transition: height 420ms cubic-bezier(0.2, 0, 0, 1); }
+/* long text that fits its well shows whole: no fade, no expand button */
+.node--long.is-fit .well::after { display: none; }
+.node--long.is-fit .node__more { display: none; }
+
+/* short text: no well, the content sits on the face */
+.node--short .node__body { padding: 14px 10px 8px; }
+
+/* ============================ INPUT window ============================ */
 #query {
   display: block;
   width: 100%;
@@ -207,96 +357,105 @@ html, body, * { scrollbar-width: none; }
   outline: none;
   color: var(--fg);
   font-family: var(--font);
-  font-size: var(--fs-text);
-  line-height: 1.5;
+  font-weight: var(--fw);
+  font-size: var(--fs-well-short);
+  line-height: var(--lh-well-short);
+  letter-spacing: -0.003em;
   resize: none;
 }
 #query::placeholder { color: var(--fg-3); }
-.input-tools { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-/* #mic-btn is a .pill (class attached in index.html); the REC dot rides inside */
-#mic-btn .mic-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg-3); }
-#mic-btn.listening .mic-dot { background: var(--led-listening); }
+.input-tools { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+#mic-btn.listening .btn__dot { background: var(--led-listening); animation: led-pulse 1s ease-in-out infinite; }
 
-/* ---- SELF (center, portrait window) */
-.portrait {
-  position: relative;
-  aspect-ratio: 848 / 1280;
-  height: min(50vh, 520px);
-  margin: 0 auto;
-  background: #ffffff;   /* the clips are white-background: a photo in the card */
-  border-radius: 6px;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.9),
-              inset 0 1px 0 rgba(255,255,255,0.15);
+/* ============================ the board ============================ */
+.stage {
+  position: fixed;
+  inset: 0;
   overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  background: var(--bg);
 }
-.portrait canvas,
-.portrait .face-video {
+.stage.is-panning { cursor: grabbing; }
+.canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  /* R3: no will-change here or on the windows — a promoted layer is
+     rasterised once and then scaled as a bitmap, which blurs zoomed text */
+}
+.canvas > .node {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  cursor: grab;
+  touch-action: none;
+  transition: box-shadow 240ms ease;
+}
+.canvas > .node.is-dragging {
+  cursor: grabbing;
+  box-shadow: var(--card-shadow-lift);
+}
+.canvas > .node.is-dragging .node__led {
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255,255,255,0.55);
+}
+
+/* wires + ports: wire layers before port layers, so ports cap the ends */
+.layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: 50% 0;   /* top-aligned: the top of the head is never cut */
-  border-radius: inherit;   /* keep the video corners from covering the groove */
-}
-.portrait .face-video { opacity: 0; transition: opacity .35s ease; pointer-events: none; }
-.portrait .face-video.front { opacity: 1; }
-
-/* ---- OUTPUT (right) */
-#node-output { width: clamp(220px, 20vw, 300px); }
-#output-body .placeholder { color: var(--fg-3); }
-#output-body.fade-in { animation: answer-in .12s ease; }
-@keyframes answer-in { from { opacity: 0; } to { opacity: 1; } }
-#output-body .answer { font-size: var(--fs-text); line-height: 1.55; white-space: pre-wrap; }
-
-/* ---- children: documents an answer brings out, as their own node cards */
-#children { display: flex; flex-direction: column; gap: 24px; align-self: center; }
-#children:empty { display: none; }
-#children.dim .child { opacity: var(--card-dim); }
-.child { width: clamp(220px, 20vw, 300px); transition: opacity .12s ease, transform .12s ease, border-color .3s ease, box-shadow .3s ease; }
-.child.entering { opacity: 0; transform: translateX(-8px); }
-.child.leaving { opacity: 0; }
-.child.expanded { width: clamp(300px, 28vw, 420px); }
-
-/* expand / collapse choreography: the card's width+height are animated by
- * WAAPI (see main.js MOTION); the outgoing block leaves the flow and sits
- * under the header as an overlay so the incoming block owns the layout */
-.child.animating { will-change: width, height; }
-.child.animating .child__preview,
-.child.animating .child__doc { will-change: opacity, transform; }
-.child.animating--expand .child__preview,
-.child.animating--collapse .child__doc {
-  position: absolute;
-  top: var(--head-h);
-  left: 0;
-  right: 0;
+  overflow: visible;
   pointer-events: none;
 }
-.node__more { transition: opacity .08s linear; }
-.child__img { display: block; width: 100%; max-height: 150px; object-fit: cover; margin-bottom: 8px; }
-.child__video { display: block; width: 100%; max-height: 180px; background: #0a0a0a; }
-.child__attach { display: block; width: 100%; max-height: 200px; object-fit: contain; background: #0a0a0a; }
-.child__excerpt { font-size: var(--fs-text); line-height: 1.5; color: var(--fg-2); }
-/* expanded doc: no internal scrollbar, the card grows with its content;
- * collapsed = height 0 (inline), the height transition reflows siblings */
-.child__doc { overflow: hidden; font-size: 13px; line-height: 1.65; }
-.child__doc h1, .child__doc h2, .child__doc h3, .child__doc h4, .child__doc h5, .child__doc h6 { margin: 0.9em 0 0.4em; line-height: 1.3; font-weight: 500; }
-.child__doc h1 { font-size: 18px; }
-.child__doc h2 { font-size: 15px; }
-.child__doc h3 { font-size: 14px; }
-.child__doc p { margin: 0.6em 0; }
-.child__doc ul, .child__doc ol { margin: 0.6em 0 0.6em 1.4em; }
-.child__doc a { color: var(--fg); }
-.child__doc code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
-.child__doc pre { background: rgba(255,255,255,0.06); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0.8em 0; }
-.child__doc pre code { padding: 0; background: none; }
-.child__doc img { max-width: 100%; }
-.child__doc hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 1.2em 0; }
-.child__doc table { border-collapse: collapse; margin: 0.8em 0; }
-.child__doc th, .child__doc td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.15); text-align: left; }
-.child__doc blockquote { border-left: 2px solid #ffffff; padding-left: 12px; margin: 0.6em 0; color: var(--fg-2); }
+.layer .wire { fill: none; stroke: var(--wire); stroke-width: 1; }
+.layer .port { fill: rgba(255,255,255,0.28); }
+.layer .port.is-linked { fill: #d9d9d9; }
+/* signal flow while the agent thinks / speaks */
+.layer .wire.flow { stroke-dasharray: 4 6; animation: wire-flow .8s linear infinite; }
+@keyframes wire-flow { from { stroke-dashoffset: 10; } to { stroke-dashoffset: 0; } }
 
-/* ---- index overlay (all memories as node cards) */
+/* spawned child windows: opacity-only entrance (the engine owns transform) */
+.child.entering { opacity: 0; transition: opacity .12s ease; }
+.child.leaving { opacity: 0; transition: opacity .12s ease; }
+
+/* module-running highlight: rim brightens, LED already carries the state */
+.node.active { --gloss: 1; }
+.node.active::before { background: linear-gradient(180deg,
+  rgba(255,255,255,0.75) 0px,
+  rgba(255,255,255,0.22) 2px,
+  rgba(255,255,255,0.12) 45%,
+  rgba(255,255,255,0.16) 90%,
+  rgba(255,255,255,0.38) 100%); }
+
+/* zoom controls — same pill material as the expand button */
+.zoombar {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  display: flex;
+  gap: 6px;
+}
+.btn--icon {
+  width: calc(var(--btn-h) + 4px);
+  padding: 0;
+  justify-content: center;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.zoombar__pct {
+  display: inline-block;
+  min-width: 38px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================ index overlay ============================ */
 #index-overlay {
   position: fixed;
   inset: 0;
@@ -305,9 +464,9 @@ html, body, * { scrollbar-width: none; }
   padding: 6vh 6vw;
   background: var(--bg);
 }
-#index-title { color: var(--label-color); font-size: 11px; letter-spacing: var(--label-tracking); margin-bottom: 24px; }
+#index-title { color: var(--label-color); font-size: 11px; letter-spacing: var(--label-tracking); margin-bottom: 24px; text-transform: lowercase; }
 #index-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
-.index-card { cursor: pointer; }
+.index-card { cursor: pointer; width: auto; }
 .index-card .node__body {
   display: flex;
   align-items: center;
@@ -321,30 +480,13 @@ html, body, * { scrollbar-width: none; }
 }
 .index-card .node__body.has-image { padding: 0; }
 .index-card .node__body img { display: block; width: 100%; max-height: 140px; object-fit: cover; }
+.index-card .node__more { display: block; padding: 0 10px 10px; }
 
-/* ---- wires: svg layer inside the canvas, sized to the graph by updateWires */
-#wires { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; }
-.wire { stroke: var(--wire); stroke-width: var(--wire-w); fill: none; }
-.wire-dot { fill: var(--wire); }
-.wire.flow { stroke-dasharray: 4 6; animation: wire-flow .8s linear infinite; }
-@keyframes wire-flow { from { stroke-dashoffset: 10; } to { stroke-dashoffset: 0; } }
-
-/* ---- LED states (§6) */
-.node__led[data-state="listening"] { background: var(--led-listening); }
-.node__led[data-state="thinking"] { background: var(--led-thinking); animation: led-pulse 1s ease-in-out infinite; }
-.node__led[data-state="speaking"] { background: var(--led-speaking); }
-@keyframes led-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-
-#mic-btn.listening .mic-dot { animation: led-pulse 1s ease-in-out infinite; }
-
-/* thinking: previous answer dims (not cleared) until the new one lands */
-#output-body.thinking { opacity: var(--card-dim); }
-
-/* ---- the only permanent misc UI: 8px dot, bottom-right */
+/* the only permanent misc UI: 8px dot, bottom-right */
 #index-dot {
   position: fixed;
   right: 18px;
-  bottom: 18px;
+  bottom: 60px;   /* clear of the zoom bar */
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -355,20 +497,8 @@ html, body, * { scrollbar-width: none; }
 }
 #index-dot:hover { background: #ffffff; }
 
-/* ---- responsive: tablet narrows the portrait, mobile stacks vertically */
-@media (max-width: 1099px) {
-  #graph { gap: 32px; }
-  .portrait { height: min(42vh, 420px); }
-}
-
-@media (max-width: 699px) {
-  html, body { overflow: auto; }   /* mobile: native vertical scroll, no pan */
-  #canvas { position: static; transform: none !important; will-change: auto; cursor: auto; }
-  #graph { flex-direction: column; gap: 32px; padding: 4vh 5vw; width: auto; min-width: 0; }
-  #node-self { order: 1; }
-  #node-output { order: 2; width: auto; }
-  #children { order: 3; align-self: stretch; gap: 20px; }
-  .child, .child.expanded { width: auto; }
-  #node-input { order: 4; width: auto; position: sticky; bottom: 0; }
-  .portrait { height: min(38vh, 320px); }
+/* ============================ reduced motion ============================ */
+@media (prefers-reduced-motion: reduce) {
+  .well, .well::after, .btn, .btn__dot,
+  .canvas > .node, .node__led { transition: none; }
 }
