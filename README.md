@@ -23,32 +23,30 @@ set `OPENAI_BASE_URL` (and optionally `OPENAI_EMBED_MODEL`).
 
 ## Use it
 
-- The screen is a small node graph on a pannable canvas: **INPUT** (left),
-  **SELF** (the portrait window, center — its title-bar dot is the status
-  LED), **OUTPUT** (right), connected by bezier wires. The input box is
-  always on screen, always ready.
+- The screen is a board of draggable windows: **s60-in** (input), **s60-self**
+  (the portrait window — its title-bar dot is the status LED), **s60-out**
+  (answers), wired port to port. The input box is always on screen, always ready.
 - Type a question, `Enter` to send (`Shift+Enter` = newline, `/` focuses the
   box). Ask: *"what did you do in week 1"*, *"the three project ideas"*,
   *"who are you"*.
-- The agent answers aloud while the answer types out in OUTPUT, in sync with
-  the voice. Memories it cites appear as **child nodes** to the right of
-  OUTPUT, one card each on their own wire — several at once (*"what are the
-  three ideas"* → three cards fanned out). `See more` expands a card in
-  place; the dot in its title bar dismisses it. No overlays, ever.
-- Drag any empty space to pan the canvas (wheel pans too, shift = sideways);
-  double-click empty space to reset the view. When the graph grows past the
-  viewport the whole canvas smoothly zooms out instead. Under 700px the page
-  falls back to native vertical scrolling.
+- The agent answers aloud while the answer types out in s60-out, in sync with
+  the voice. Memories it cites appear as **child windows** to the right of
+  s60-out, one card each on their own wire — several at once (*"what are the
+  three ideas"* → three cards). Long texts live in clipped wells with an
+  `expand` pill that grows them in place; the dot in a child's title bar
+  dismisses it. No overlays, ever.
+- Drag any window to move it (it leans and lifts while held); drag empty
+  space to pan the board; the mouse wheel zooms around the cursor (trackpad
+  pinch too). Bottom-right zoom controls: `−` / percentage (= fit all) / `+`;
+  keys Cmd/Ctrl `=` `-` `0` do the same.
 - `/index` or the tiny dot at bottom-right opens a card grid of every memory;
-  click a card to load it into OUTPUT + a child node (no speech).
-  `Esc` stops speech and folds expanded cards back.
+  click a card to load it into s60-out + a child window (no speech).
+  `Esc` stops speech and folds expanded wells back.
 - Mic button = speech input (Chrome only).
 - Online (the Vercel deployment) the default brain is **live** (cloud API);
   locally it stays the static brain. `?brain=static` forces the static,
   no-network mode anywhere. If the live brain fails it silently falls back
   to static (and disables itself for the session on hosts with no backend).
-- Desktop: mouse wheel zooms, trackpad two-finger pans, pinch zooms, drag empty
-  space to pan, double-click empty space (or `0`) to re-fit, `+`/`-` to zoom.
 
 ## Live brain mode (cloud API agent loop)
 
@@ -106,9 +104,10 @@ Who the digital self *is* lives in `content/persona.json`.
 ## Structure
 
 ```
-index.html          single page: pannable canvas, node cards, wires svg, children column
-css/main.css        node-graph theme: design tokens, beveled cards, wires, child nodes
-js/canvas.js        canvas pan + auto-fit zoom-out, clamp, auto-reveal
+index.html          single page: board stage, three windows, zoom controls
+css/main.css        board design system: beveled chassis, wells, pills, wires
+js/canvas.js        the board engine: viscous window drag, anchored wheel zoom,
+                    pan, fit-all, ports + wires
 js/face.js          procedural face renderer (fallback when video clips are missing)
 js/facevideo.js     video face renderer (assets/idle.mp4 + assets/talking.mp4 loops)
 js/voice.js         TTS mouth-driving + chunked speech + optional STT
@@ -118,7 +117,7 @@ js/apibrain.js      live mode: DeepSeek via /api/chat, recall via /api/recall
 js/memory.js        manifest + persona loader, keyword search, document fetch
 js/markdown.js      minimal md→html (tables, blockquotes), zero dependencies
 js/agent.js         conversation state machine
-js/main.js          boot + UI (nodes, wires, children, typewriter reveal)
+js/main.js          boot + UI (windows, wells, children, typewriter reveal)
 api/chat.js         serverless proxy: DeepSeek chat completions
 api/recall.js       serverless search: BM25 + vector RRF over content/index.json
 lib/                embed.js (OpenAI query vectors), index.js (index loader),
