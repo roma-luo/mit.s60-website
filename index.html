@@ -8,7 +8,7 @@
   /* boot v2 critical css: paints on the first frame, before any script */
   #boot{position:fixed;inset:0;z-index:1000;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;cursor:pointer;transition:opacity .6s ease}
   #boot.boot--done{opacity:0;pointer-events:none}
-  #boot .boot__name{color:#d4d4d4;font:300 15px/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:.18em}
+  #boot .boot__name{color:#d4d4d4;font:400 15px/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:.18em}
   #boot .boot__bar{width:min(220px,40vw);height:1px;background:rgba(255,255,255,.15)}
   #boot .boot__bar-fill{display:block;height:100%;width:0;background:rgba(255,255,255,.85);transition:width .25s ease}
   html[data-boot=off] #boot{display:none!important}
@@ -52,62 +52,69 @@
   </script>
   <script src="js/boot.js"></script>
 
-  <div id="canvas">
-    <svg id="wires" aria-hidden="true">
-      <path id="wire-in" class="wire" d=""/>
-      <path id="wire-out" class="wire" d=""/>
-      <circle id="wire-in-a" class="wire-dot" r="3"/>
-      <circle id="wire-in-b" class="wire-dot" r="3"/>
-      <circle id="wire-out-a" class="wire-dot" r="3"/>
-      <circle id="wire-out-b" class="wire-dot" r="3"/>
-    </svg>
+  <div class="stage" id="stage" aria-label="Board: scroll to zoom, drag empty space to pan">
+    <div class="canvas" id="canvas">
 
-    <main id="graph">
-    <section class="node" id="node-input" data-label="S60-IN">
-      <header class="node__head">
-        <span class="node__label">S60-IN</span>
-        <span class="node__led" data-state="idle"></span>
-      </header>
-      <div class="node__body">
-        <textarea id="query" rows="4" placeholder="enter input"></textarea>
-        <div class="input-tools">
-          <button id="mic-btn" class="pill" title="speak"><span class="mic-dot"></span>REC</button>
+      <section class="node node--short" id="node-input" data-kind="text" data-label="s60-in" data-x="60" data-y="90">
+        <header class="node__head">
+          <span class="node__label">s60-in</span>
+          <span class="node__led" data-state="idle"></span>
+        </header>
+        <div class="node__body">
+          <textarea id="query" rows="4" placeholder="enter input"></textarea>
+          <div class="input-tools">
+            <button id="mic-btn" class="btn" type="button" title="speak"><span class="btn__dot mic-dot"></span><span class="btn__label">rec</span></button>
+            <button id="send-btn" class="btn" type="button" title="send"><span class="btn__dot"></span><span class="btn__label">send</span></button>
+          </div>
         </div>
-      </div>
-      <footer class="node__meta" id="input-meta">
-        <div class="meta-row"><span>Mode:</span><b id="input-mode">static</b></div>
-        <div class="meta-row"><span>Status:</span><b id="input-status">idle</b></div>
-      </footer>
-    </section>
+        <footer class="node__meta">
+          <div class="meta-rows">
+            <div class="meta-row"><span>Mode:</span><b id="input-mode">static</b></div>
+            <div class="meta-row"><span>Status:</span><b id="input-status">idle</b></div>
+          </div>
+        </footer>
+      </section>
 
-    <section class="node" id="node-self" data-label="S60-SELF">
-      <header class="node__head">
-        <span class="node__label">S60-SELF</span>
-        <span class="node__led" id="self-led" data-state="idle"></span>
-      </header>
-      <div class="node__body">
-        <div class="portrait" id="portrait"></div>
-      </div>
-      <footer class="node__meta" id="self-meta"></footer>
-    </section>
+      <section class="node node--image" id="node-self" data-kind="image" data-label="s60-self" data-x="440" data-y="40">
+        <header class="node__head">
+          <span class="node__label">s60-self</span>
+          <span class="node__led" id="self-led" data-state="idle"></span>
+        </header>
+        <div class="node__body">
+          <div class="portrait" id="portrait"></div>
+        </div>
+        <footer class="node__meta">
+          <div class="meta-rows" id="self-meta"></div>
+        </footer>
+      </section>
 
-    <section class="node" id="node-output" data-label="S60-OUT-01">
-      <header class="node__head">
-        <span class="node__label" id="output-label">S60-OUT-01</span>
-        <span class="node__led" id="output-led" data-state="empty"></span>
-      </header>
-      <div class="node__body" id="output-body">
-        <p class="placeholder">...?</p>
-      </div>
-      <footer class="node__meta hidden" id="output-meta"></footer>
-    </section>
+      <section class="node node--long" id="node-output" data-kind="text" data-label="s60-out-01" data-x="820" data-y="90">
+        <header class="node__head">
+          <span class="node__label" id="output-label">s60-out-01</span>
+          <span class="node__led" id="output-led" data-state="idle"></span>
+        </header>
+        <div class="node__body">
+          <div class="well" id="output-well">
+            <div class="well__text" id="output-text"><p class="placeholder">...?</p></div>
+          </div>
+        </div>
+        <footer class="node__meta">
+          <div class="meta-rows" id="output-meta"></div>
+          <button class="btn node__more" id="output-more" type="button" aria-expanded="false"><span class="btn__dot"></span><span class="btn__label">expand</span></button>
+        </footer>
+      </section>
 
-    <div id="children"></div>
-    </main>
+    </div>
   </div>
 
+  <nav class="zoombar" aria-label="Zoom">
+    <button class="btn btn--icon" type="button" data-zoom="out" aria-label="Zoom out">&minus;</button>
+    <button class="btn" type="button" data-zoom="fit" aria-label="Fit all windows"><span class="zoombar__pct" id="pct">100%</span></button>
+    <button class="btn btn--icon" type="button" data-zoom="in" aria-label="Zoom in">+</button>
+  </nav>
+
   <div id="index-overlay" class="hidden">
-    <p id="index-title">INDEX</p>
+    <p id="index-title">index</p>
     <div id="index-grid"></div>
   </div>
 

@@ -1,17 +1,27 @@
-/* main — boot and UI wiring for the node-graph layout.
+/* main — boot and UI wiring for the node-board layout.
  * Exposes the UI object used by Agent:
- *   UI.setState(st)              — LED + INPUT Status meta + wire flow + active card
- *   UI.setAnswer(res, opts)      — rebuild the OUTPUT node body (text only)
+ *   UI.setState(st)              — LED states, wire flow, running-module rim
+ *   UI.setAnswer(res, opts)      — fill the OUTPUT well (+ typewriter reveal)
  *   UI.spawnChildren(entries, round) / UI.cancelSpawn() / UI.collapseChildren()
- *   UI.setLastQuery(q)           — INPUT meta third row
+ *   UI.setMode(mode)             — INPUT meta Mode row
  *   UI.showIndex() / UI.hideIndex()
- * Answers bring their documents out as CHILD NODES on the canvas — there are
- * no overlays or masks; "See more" expands a child card in place.
+ * The three windows (INPUT / SELF / OUTPUT) and every spawned child are free
+ * bodies on the board; js/canvas.js owns dragging, zoom, pan and wires.
  */
+
+const LABELS = {
+  input: 's60-in',
+  self: 's60-self',
+  out: 's60-out',
+  output: n => 's60-out-' + String(n).padStart(2, '0'),
+  child: entry => 's60-out-' + Memory.label(entry).toLowerCase(),
+  video: (entry, att) => 's60-out-' + Memory.label({ title: entry.section }).toLowerCase() + ' · ' + attachmentLabel(att).toLowerCase(),
+  attach: (entry, att) => LABELS.child(entry) + ' · ' + att.split('/').pop().replace(/\.[^.]*$/, '').split('-').pop(),
+  mem: id => 's60-mem-' + String(id).toLowerCase()
+};
 
 // attachment label from the filename: strip extension, split on '-', drop a
 // leading "recording" token, uppercase the rest + RECORDING
-// ("recording-process.mp4" → "PROCESS RECORDING")
 function attachmentLabel(att) {
   const stem = att.split('/').pop().replace(/\.[^.]*$/, '');
   const parts = stem.split('-');
@@ -19,32 +29,16 @@ function attachmentLabel(att) {
   return (parts.join(' ').toUpperCase() + ' RECORDING').trim();
 }
 
-const LABELS = {
-  input: 'S60-IN',
-  self: 'S60-SELF',
-  out: 'S60-OUT',
-  output: n => 'S60-OUT-' + String(n).padStart(2, '0'),
-  child: (outLabel, entry) => outLabel + '-' + Memory.label(entry),
-  video: (entry, att) => LABELS.out + '-' + Memory.label({ title: entry.section }) + ' · ' + attachmentLabel(att),
-  // image attachments: parent doc label + the filename's last hyphen token
-  // ("idea-1-diagram.jpg" → "S60-OUT-FINAL IDEA 01 · DIAGRAM")
-  attach: (entry, att) => LABELS.child(LABELS.out, entry) + ' · '
-    + att.split('/').pop().replace(/\.[^.]*$/, '').split('-').pop().toUpperCase(),
-  mem: id => 'S60-MEM-' + String(id).toUpperCase()
-};
-
-const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp'];
-
 const UI = (() => {
   const $ = id => document.getElementById(id);
-  const SVGNS = 'http://www.w3.org/2000/svg';
   let answerCount = 0;
   let answerEl = null;
   let answerText = '';
   let revealTimer = null;
   let spawnGen = 0;
   let spawnRound = null;
-  let nodeObserver = null;
+  let outputExpander = null;
+  const expanders = new Map(); // child element → well expander
 
   function metaRow(key, value) {
     const row = document.createElement('div');
@@ -64,17 +58,15 @@ const UI = (() => {
     return new URL(entry.file, document.baseURI).href;
   }
 
-  /* ---- state → UI (§6): SELF LED, INPUT Status meta, wire flow, OUTPUT dim */
+  /* ---- state → UI: SELF LED, INPUT Status, wire flow, running-module rim */
   function setState(st) {
     $('self-led').dataset.state = st === 'showing' ? 'idle' : st;
     $('input-status').textContent = st === 'showing' ? 'idle' : st;
-    $('wire-in').classList.toggle('flow', st === 'thinking');
-    $('wire-out').classList.toggle('flow', st === 'speaking');
-    $('output-body').classList.toggle('thinking', st === 'thinking');
-    // thinking dims last round's children; they are replaced when the new
-    // answer lands (not deleted upfront)
-    $('children').classList.toggle('dim', st === 'thinking');
-    // ComfyUI-style: the running module's card border highlights
+    if (typeof Canvas !== 'undefined') {
+      Canvas.setFlow('wire-in', st === 'thinking');
+      Canvas.setFlow('wire-out', st === 'speaking');
+    }
+    // ComfyUI-style: the running module's rim brightens
     const active = { listening: 'node-input', thinking: 'node-self', speaking: 'node-output' }[st] || null;
     for (const id of ['node-input', 'node-self', 'node-output']) {
       $(id).classList.toggle('active', id === active);
@@ -83,17 +75,6 @@ const UI = (() => {
 
   function setMode(mode) {
     $('input-mode').textContent = mode;
-  }
-
-  function setLastQuery(q) {
-    const meta = $('input-meta');
-    let row = $('input-last-row');
-    if (!row) {
-      row = metaRow('Last', '');
-      row.id = 'input-last-row';
-      meta.appendChild(row);
-    }
-    row.querySelector('b').textContent = q.length > 60 ? q.slice(0, 60) + '…' : q;
   }
 
   async function lastModified(url) {
@@ -113,191 +94,29 @@ const UI = (() => {
     meta.appendChild(metaRow('Memory Updated', await lastModified('content/manifest.json')));
   }
 
-  /* ---- wires: bezier paths between node edge midpoints */
-  function wireD(x1, y1, x2, y2, vertical) {
-    return vertical
-      ? `M ${x1} ${y1} C ${x1} ${y1 + (y2 - y1) * 0.5}, ${x2} ${y2 - (y2 - y1) * 0.5}, ${x2} ${y2}`
-      : `M ${x1} ${y1} C ${x1 + (x2 - x1) * 0.5} ${y1}, ${x2 - (x2 - x1) * 0.5} ${y2}, ${x2} ${y2}`;
-  }
-
-  function setWire(path, dotA, dotB, x1, y1, x2, y2, vertical) {
-    path.setAttribute('d', wireD(x1, y1, x2, y2, vertical));
-    dotA.setAttribute('cx', x1); dotA.setAttribute('cy', y1);
-    dotB.setAttribute('cx', x2); dotB.setAttribute('cy', y2);
-  }
-
-  function setNamedWire(name, x1, y1, x2, y2, vertical) {
-    setWire($(name), $(name + '-a'), $(name + '-b'), x1, y1, x2, y2, vertical);
-  }
-
-  function setWireVisible(name, visible) {
-    const d = visible ? '' : 'none';
-    $(name).style.display = d;
-    $(name + '-a').style.display = d;
-    $(name + '-b').style.display = d;
-  }
-
-  // A4: keep the three main cards optically centered regardless of the
-  // children column — padding-left = max(6vw, (vw − cards − 2 gaps) / 2),
-  // computed on load/resize only, so a child appearing or expanding never
-  // shifts INPUT/SELF/OUTPUT; the graph only extends to the right
-  function centerGraph() {
-    const graph = $('graph');
-    if (window.innerWidth < 700) { graph.style.paddingLeft = ''; return; }
-    const gap = parseFloat(getComputedStyle(graph).columnGap) || 0;
-    const cards = ['node-input', 'node-self', 'node-output']
-      .reduce((sum, id) => sum + $(id).getBoundingClientRect().width, 0);
-    const pad = Math.max(window.innerWidth * 0.06, (window.innerWidth - cards - 2 * gap) / 2);
-    graph.style.paddingLeft = pad + 'px';
-  }
-
-  // one wire per child, created on demand and keyed by the child's data-id;
-  // a freshly spawned wire draws itself on (dashoffset 1 → 0, 300ms)
-  function childWireEls(svg, id, animate) {
-    let path = svg.querySelector('path.wire-child[data-for="' + id + '"]');
-    if (path) {
-      return {
-        path,
-        dotA: svg.querySelector('circle.wire-child-a[data-for="' + id + '"]'),
-        dotB: svg.querySelector('circle.wire-child-b[data-for="' + id + '"]')
-      };
-    }
-    path = document.createElementNS(SVGNS, 'path');
-    path.setAttribute('class', 'wire wire-child');
-    path.dataset.for = id;
-    const dotA = document.createElementNS(SVGNS, 'circle');
-    dotA.setAttribute('class', 'wire-dot wire-child-a');
-    dotA.setAttribute('r', 3);
-    dotA.dataset.for = id;
-    const dotB = document.createElementNS(SVGNS, 'circle');
-    dotB.setAttribute('class', 'wire-dot wire-child-b');
-    dotB.setAttribute('r', 3);
-    dotB.dataset.for = id;
-    svg.appendChild(path);
-    svg.appendChild(dotA);
-    svg.appendChild(dotB);
-    if (animate) {
-      path.setAttribute('pathLength', '1');
-      path.style.strokeDasharray = '1';
-      path.style.strokeDashoffset = '1';
-      path.style.transition = 'stroke-dashoffset .3s ease';
-      requestAnimationFrame(() => { path.style.strokeDashoffset = '0'; });
-      setTimeout(() => {
-        path.removeAttribute('pathLength');
-        path.style.strokeDasharray = '';
-        path.style.strokeDashoffset = '';
-        path.style.transition = '';
-      }, 320);
-    }
-    return { path, dotA, dotB };
-  }
-
-  // desktop: every child gets one wire from OUTPUT's right-edge midpoint — a
-  // fan with a single shared origin. mobile (<700px): chain instead —
-  // OUTPUT bottom → child1 top, child1 bottom → child2 top … (a fan would
-  // cross itself in the vertical stack). Returns the last child's rect.
-  function syncChildWires(rel, ro, animate, mobile) {
-    const svg = $('wires');
-    const seen = new Set();
-    const from = { x: mobile ? ro.l + ro.w / 2 : ro.r, y: mobile ? ro.b : ro.t + ro.h / 2 };
-    let lastRect = null;
-    for (const card of $('children').children) {
-      const id = card.dataset.id;
-      seen.add(id);
-      const { path, dotA, dotB } = childWireEls(svg, id, animate);
-      const rc = rel(card);
-      if (mobile) {
-        setWire(path, dotA, dotB, from.x, from.y, rc.l + rc.w / 2, rc.t, true);
-        from.x = rc.l + rc.w / 2;
-        from.y = rc.b;
-      } else {
-        setWire(path, dotA, dotB, from.x, from.y, rc.l, rc.t + rc.h / 2);
-      }
-      lastRect = rc;
-    }
-    for (const el of svg.querySelectorAll('[data-for]')) {
-      if (!seen.has(el.dataset.for)) el.remove();
-    }
-    return lastRect;
-  }
-
-  function updateWires(animateNew) {
-    const anim = animateNew === true; // ResizeObserver/events pass objects
-    const svg = $('wires');
-    const graph = $('graph');
-    // the svg spans the whole graph; all points are in canvas space
-    // (rect(el) − rect(#canvas)), so panning moves wires with the cards
-    // without any recompute
-    const w = graph.scrollWidth;
-    const h = graph.scrollHeight;
-    svg.setAttribute('width', w);
-    svg.setAttribute('height', h);
-    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    const c = $('canvas').getBoundingClientRect();
-    // divide rect deltas by the live visual zoom (canvas rect vs its layout
-    // width) so wires stay in canvas/layout space at any zoom level — glued
-    // to the cards even mid-zoom-transition
-    const z = c.width / Math.max(1, $('canvas').offsetWidth);
-    const rel = el => {
-      const r = el.getBoundingClientRect();
-      return { l: (r.left - c.left) / z, t: (r.top - c.top) / z, r: (r.right - c.left) / z, b: (r.bottom - c.top) / z, w: r.width / z, h: r.height / z };
-    };
-    const ri = rel($('node-input'));
-    const rs = rel($('node-self'));
-    const ro = rel($('node-output'));
-    if (window.innerWidth < 700) {
-      // mobile stacks SELF → OUTPUT → children → INPUT; INPUT is a control,
-      // not a node, and never gets a wire (its sticky rect moves on scroll
-      // and there is no scroll listener anymore) — the spine ends at the
-      // last child; with no children, wire-out hides
-      setNamedWire('wire-in', rs.l + rs.w / 2, rs.b, ro.l + ro.w / 2, ro.t, true);
-      const lastChild = syncChildWires(rel, ro, anim, true);
-      setWireVisible('wire-out', !!lastChild);
-      if (lastChild) {
-        setNamedWire('wire-out', ro.l + ro.w / 2, ro.b, lastChild.l + lastChild.w / 2, lastChild.t, true);
-      }
-    } else {
-      // INPUT right-edge midpoint → SELF left-edge midpoint; SELF → OUTPUT same
-      setNamedWire('wire-in', ri.r, ri.t + ri.h / 2, rs.l, rs.t + rs.h / 2);
-      setNamedWire('wire-out', rs.r, rs.t + rs.h / 2, ro.l, ro.t + ro.h / 2);
-      setWireVisible('wire-out', true);
-      syncChildWires(rel, ro, anim, false);
-    }
-  }
-
-  /* ---- OUTPUT node (text only; attached docs live in child nodes) */
+  /* ---- OUTPUT well (long-text window) */
   async function setAnswer(res, opts = {}) {
     stopReveal();
     answerCount++;
     $('output-label').textContent = LABELS.output(answerCount);
-    $('output-led').dataset.state = 'idle'; // has content: white dot
     $('node-output').dataset.label = LABELS.output(answerCount);
+    $('output-led').dataset.state = 'idle'; // has content: lit
 
-    const body = $('output-body');
-    body.classList.remove('thinking');
-    body.innerHTML = '';
+    const wellText = $('output-text');
+    wellText.innerHTML = '';
     answerText = res.text || '';
     const p = document.createElement('p');
     p.className = 'answer';
     p.textContent = opts.reveal ? '' : answerText;
-    body.appendChild(p);
+    wellText.appendChild(p);
     answerEl = p;
 
-    setAttached(0);
-
-    // new answer enters with a 120ms opacity fade, no sliding
-    body.classList.remove('fade-in');
-    void body.offsetWidth;
-    body.classList.add('fade-in');
-    updateWires();
-  }
-
-  function setAttached(n) {
     const meta = $('output-meta');
     meta.innerHTML = '';
-    if (!n) { meta.classList.add('hidden'); return; }
-    meta.appendChild(metaRow('Attached', n + (n === 1 ? ' memory' : ' memories')));
-    meta.classList.remove('hidden');
+    meta.appendChild(metaRow('Artifact', opts.entry ? opts.entry.title : 'answer'));
+    meta.appendChild(metaRow('Type', 'text / plain'));
+
+    if (outputExpander) outputExpander.measure();
   }
 
   /* ---- typewriter reveal: speech-boundary driven (charIndex) with a uniform
@@ -330,18 +149,64 @@ const UI = (() => {
     if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
   }
 
-  /* ---- child nodes: the documents an answer brings out */
+  /* ---- long-text wells: expand / collapse (R5 fit rule, R7 pin-px) */
+  function initWellExpand(card, onFirstExpand) {
+    const btn = card.querySelector('.node__more');
+    const well = card.querySelector('.well');
+    const text = card.querySelector('.well__text');
+    const label = btn.querySelector('.btn__label');
+    let open = false;
+
+    // only offer expand when the text really overruns its 4:3 well
+    const measure = () => {
+      if (open) return;
+      const fits = text.scrollHeight <= well.clientHeight + 1;
+      if (card.classList.contains('is-fit') !== fits) {
+        card.classList.toggle('is-fit', fits);
+      }
+    };
+    measure();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+
+    btn.addEventListener('click', async () => {
+      if (!open && onFirstExpand) await onFirstExpand();
+      // offsetHeight / clientWidth are layout px — unaffected by zoom or lean
+      const from = well.offsetHeight;
+      open = !open;
+      const to = open ? text.scrollHeight : well.clientWidth * 3 / 4;
+      well.style.aspectRatio = 'auto';         // aspect-ratio can't animate: pin px first
+      well.style.height = from + 'px';
+      void well.offsetHeight;
+      well.classList.toggle('is-open', open);
+      btn.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', String(open));
+      label.textContent = open ? 'collapse' : 'expand';
+      well.style.height = to + 'px';
+      if (typeof Canvas !== 'undefined') Canvas.reflow(480); // 420ms + a frame or two
+    });
+    well.addEventListener('transitionend', e => {
+      if (e.propertyName !== 'height' || open) return;
+      well.style.aspectRatio = '4 / 3';        // hand the box back to the ratio
+      well.style.height = '';
+      measure();
+    });
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(measure).observe(text);
+
+    return { measure, isOpen: () => open, collapse: () => { if (open) btn.click(); } };
+  }
+
+  /* ---- child windows: the documents an answer brings out */
   function buildChild(entry) {
     const card = document.createElement('section');
-    card.className = 'node child';
+    card.className = 'node node--long child';
+    card.id = 'c-' + entry.id;
     card.dataset.id = entry.id;
-    card.dataset.round = answerCount;
 
     const head = document.createElement('header');
     head.className = 'node__head';
     const label = document.createElement('span');
     label.className = 'node__label';
-    label.textContent = LABELS.child(LABELS.out, entry);
+    label.textContent = LABELS.child(entry);
     const close = document.createElement('button');
     close.className = 'node__close';
     close.setAttribute('aria-label', 'dismiss');
@@ -349,334 +214,152 @@ const UI = (() => {
     head.appendChild(label);
     head.appendChild(close);
 
-    const preview = document.createElement('div');
-    preview.className = 'node__body child__preview';
+    const body = document.createElement('div');
+    body.className = 'node__body';
+    const well = document.createElement('div');
+    well.className = 'well';
+    const wellText = document.createElement('div');
+    wellText.className = 'well__text';
     const p = document.createElement('p');
-    p.className = 'child__excerpt';
     p.textContent = 'recalling…';
-    preview.appendChild(p);
-    Memory.excerpt(entry).then(t => { p.textContent = t || entry.answer; });
-    Memory.firstImage(entry).then(url => {
-      if (!url) return;
-      const img = document.createElement('img');
-      img.className = 'child__img';
-      img.src = url;
-      img.alt = entry.title;
-      preview.insertBefore(img, p);
-    });
-
-    const doc = document.createElement('div');
-    doc.className = 'node__body child__doc hidden';
+    wellText.appendChild(p);
+    well.appendChild(wellText);
+    body.appendChild(well);
+    Memory.excerpt(entry).then(t => { if (!card.dataset.full) p.textContent = t || entry.answer; });
 
     const meta = document.createElement('footer');
     meta.className = 'node__meta';
-    meta.appendChild(metaRow('Memory', entry.title));
-    meta.appendChild(metaRow('Section', entry.section));
-    meta.appendChild(metaRow('Source', entry.file));
-
-    const more = document.createElement('a');
-    more.className = 'node__more pill';
-    more.href = '#';
-    more.textContent = 'See more';
-    more.addEventListener('click', ev => { ev.preventDefault(); toggleChild(card, entry); });
-
-    card.appendChild(head);
-    card.appendChild(preview);
-    card.appendChild(doc);
-    card.appendChild(meta);
-    card.appendChild(more);
-    return card;
-  }
-
-  // route attachments by extension: images get an image card, everything
-  // else keeps the video card
-  function buildAttachmentChild(entry, att) {
-    const ext = ((att.match(/\.([a-z0-9]+)$/i) || [])[1] || '').toLowerCase();
-    if (IMAGE_EXTS.includes(ext)) return buildImageChild(entry, att, ext);
-    return buildVideoChild(entry, att);
-  }
-
-  // image attachments (jpg/png/webp) spawn a plain image card, no See more
-  function buildImageChild(entry, att, ext) {
-    const dir = entry.file.split('/').slice(0, -1).join('/');
-    const url = new URL(att, new URL(entry.file, document.baseURI)).href;
-
-    const card = document.createElement('section');
-    card.className = 'node child child--image';
-    card.dataset.id = entry.id + '#' + att;
-    card.dataset.round = answerCount;
-
-    const head = document.createElement('header');
-    head.className = 'node__head';
-    const label = document.createElement('span');
-    label.className = 'node__label';
-    label.textContent = LABELS.attach(entry, att);
-    const close = document.createElement('button');
-    close.className = 'node__close';
-    close.setAttribute('aria-label', 'dismiss');
-    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(card); });
-    head.appendChild(label);
-    head.appendChild(close);
-
-    const body = document.createElement('div');
-    body.className = 'node__body';
-    const img = document.createElement('img');
-    img.className = 'child__attach';
-    img.src = url;
-    img.alt = entry.title;
-    body.appendChild(img);
-
-    const meta = document.createElement('footer');
-    meta.className = 'node__meta';
-    meta.appendChild(metaRow('Memory', entry.title));
-    meta.appendChild(metaRow('Type', 'image/' + (ext === 'jpg' ? 'jpeg' : ext)));
-    meta.appendChild(metaRow('Source', dir + '/' + att));
+    const rows = document.createElement('div');
+    rows.className = 'meta-rows';
+    rows.appendChild(metaRow('Artifact', entry.title));
+    rows.appendChild(metaRow('Type', 'text / markdown'));
+    const more = document.createElement('button');
+    more.className = 'btn node__more';
+    more.type = 'button';
+    more.setAttribute('aria-expanded', 'false');
+    more.innerHTML = '<span class="btn__dot"></span><span class="btn__label">expand</span>';
+    meta.appendChild(rows);
+    meta.appendChild(more);
 
     card.appendChild(head);
     card.appendChild(body);
     card.appendChild(meta);
-    return card;
-  }
 
-  // one small video card per attachment, spawned right after its parent doc
-  // card; the URL resolves against the parent doc's own directory
-  function buildVideoChild(entry, att) {
-    const dir = entry.file.split('/').slice(0, -1).join('/');
-    const url = new URL(att, new URL(entry.file, document.baseURI)).href;
-    const ext = (att.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
-
-    const card = document.createElement('section');
-    card.className = 'node child child--video';
-    card.dataset.id = entry.id + '#' + att;
-    card.dataset.round = answerCount;
-
-    const head = document.createElement('header');
-    head.className = 'node__head';
-    const label = document.createElement('span');
-    label.className = 'node__label';
-    label.textContent = LABELS.video(entry, att);
-    const close = document.createElement('button');
-    close.className = 'node__close';
-    close.setAttribute('aria-label', 'dismiss');
-    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(card); });
-    head.appendChild(label);
-    head.appendChild(close);
-
-    const body = document.createElement('div');
-    body.className = 'node__body';
-    const video = document.createElement('video');
-    video.className = 'child__video';
-    video.controls = true;
-    video.preload = 'metadata';
-    video.playsInline = true;
-    video.src = url;
-    body.appendChild(video);
-
-    const meta = document.createElement('footer');
-    meta.className = 'node__meta';
-    meta.appendChild(metaRow('Memory', entry.title));
-    meta.appendChild(metaRow('Type', ext ? 'video/' + ext.toLowerCase() : 'video'));
-    meta.appendChild(metaRow('Source', dir + '/' + att));
-
-    card.appendChild(head);
-    card.appendChild(body);
-    card.appendChild(meta);
-    return card;
-  }
-
-  const MOTION = {
-    expand:   { size: 440, out: 140, inDelay: 120, ease: 'cubic-bezier(0.32, 0.72, 0, 1)' },
-    collapse: { size: 360, out: 120, inDelay: 100, ease: 'cubic-bezier(0.32, 0.72, 0, 1)' },
-    stagger: 40,
-    easeOut: 'cubic-bezier(0, 0, 0.2, 1)',
-    easeIn:  'cubic-bezier(0.4, 0, 1, 1)'
-  };
-
-  const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // current rendered size (mid-animation aware): computed style reflects the
-  // running WAAPI values, offset* would report the layout target instead
-  function renderedSize(card) {
-    const cs = getComputedStyle(card);
-    return { w: parseFloat(cs.width), h: parseFloat(cs.height) };
-  }
-
-  function cancelCardAnims(card) {
-    for (const a of card.getAnimations({ subtree: true })) a.cancel();
-  }
-
-  // "See more" ↔ "See less": fade out, swap text at the midpoint, fade in
-  function swapLabel(el, text, delay, reduced) {
-    if (reduced) { el.textContent = text; return; }
-    setTimeout(() => {
-      el.style.opacity = '0';
-      setTimeout(() => { el.textContent = text; el.style.opacity = ''; }, 80);
-    }, delay);
-  }
-
-  // See more ↔ See less. FLIP: measure start size, switch the DOM to the
-  // final state, measure end size, then animate the CARD's width+height
-  // between them while preview/doc cross-fade in place. Interruptible: a
-  // click mid-animation reverses from the current rendered size.
-  async function toggleChild(card, entry) {
-    const preview = card.querySelector('.child__preview');
-    const doc = card.querySelector('.child__doc');
-    const more = card.querySelector('.node__more');
-    const expanding = !card.classList.contains('expanded');
-
-    if (expanding && !doc.dataset.loaded) {
-      doc.dataset.loaded = '1';
-      more.textContent = '…';
+    expanders.set(card, initWellExpand(card, async () => {
+      // first expand: swap the excerpt for the full markdown document
+      card.dataset.full = '1';
       try {
         const md = await Memory.fetchDoc(entry);
-        doc.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
-        await settleImages(doc);
+        wellText.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
       } catch (err) {
-        doc.innerHTML = '<p>(this memory could not be loaded)</p>';
+        wellText.innerHTML = '<p>(this memory could not be loaded)</p>';
       }
-      more.textContent = 'See more';
+    }));
+    return card;
+  }
+
+  // one small media window per attachment, spawned right after its parent doc
+  function buildAttachmentChild(entry, att) {
+    const ext = ((att.match(/\.([a-z0-9]+)$/i) || [])[1] || '').toLowerCase();
+    const isImage = ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+    const dir = entry.file.split('/').slice(0, -1).join('/');
+    const url = new URL(att, new URL(entry.file, document.baseURI)).href;
+
+    const card = document.createElement('section');
+    card.className = 'node node--image child';
+    card.id = 'c-' + entry.id + '#' + att;
+    card.dataset.id = entry.id + '#' + att;
+
+    const head = document.createElement('header');
+    head.className = 'node__head';
+    const label = document.createElement('span');
+    label.className = 'node__label';
+    label.textContent = isImage ? LABELS.attach(entry, att) : LABELS.video(entry, att);
+    const close = document.createElement('button');
+    close.className = 'node__close';
+    close.setAttribute('aria-label', 'dismiss');
+    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(card); });
+    head.appendChild(label);
+    head.appendChild(close);
+
+    const body = document.createElement('div');
+    body.className = 'node__body';
+    const frame = document.createElement('div');
+    frame.className = 'portrait';
+    if (isImage) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = entry.title;
+      frame.appendChild(img);
+    } else {
+      const video = document.createElement('video');
+      video.src = url;
+      video.controls = true;
+      video.preload = 'metadata';
+      video.playsInline = true;
+      frame.appendChild(video);
     }
-    return runChildTransition(card, expanding, 0);
-  }
+    body.appendChild(frame);
 
-  // images that arrive after the end-size measurement would make the card
-  // grow again after the animation; wait (briefly) for them first
-  function settleImages(root) {
-    const imgs = [...root.querySelectorAll('img')].filter(i => !i.complete);
-    if (!imgs.length) return Promise.resolve();
-    const all = Promise.all(imgs.map(i => i.decode ? i.decode().catch(() => {}) : new Promise(r => { i.onload = i.onerror = r; })));
-    return Promise.race([all, new Promise(r => setTimeout(r, 300))]);
-  }
+    const meta = document.createElement('footer');
+    meta.className = 'node__meta';
+    const rows = document.createElement('div');
+    rows.className = 'meta-rows';
+    rows.appendChild(metaRow('Artifact', entry.title));
+    rows.appendChild(metaRow('Type', isImage ? 'image / ' + (ext === 'jpg' ? 'jpeg' : ext || 'image') : 'video / ' + (ext || 'mp4')));
+    meta.appendChild(rows);
 
-  function runChildTransition(card, expanding, delay) {
-    const preview = card.querySelector('.child__preview');
-    const doc = card.querySelector('.child__doc');
-    const more = card.querySelector('.node__more');
-    const reduced = reducedMotion();
-    const M = expanding ? MOTION.expand : MOTION.collapse;
-    const outgoing = expanding ? preview : doc;
-    const incoming = expanding ? doc : preview;
-
-    // 1. start size = whatever is on screen right now (handles interrupts)
-    const led = card.querySelector('.node__led');
-    if (led) led.dataset.state = 'thinking';
-    const s0 = renderedSize(card);
-    cancelCardAnims(card);
-
-    // 2. final DOM state: both blocks visible, outgoing overlaid via CSS
-    card.classList.remove('animating--expand', 'animating--collapse');
-    card.classList.add('animating', expanding ? 'animating--expand' : 'animating--collapse');
-    card.classList.toggle('expanded', expanding);
-    preview.classList.remove('hidden');
-    doc.classList.remove('hidden');
-
-    // 3. end size, from real layout
-    const s1 = { w: card.offsetWidth, h: card.offsetHeight };
-
-    // 4. canvas glides to the FINAL footprint while the card grows
-    if (expanding && typeof Canvas !== 'undefined') Canvas.reveal(card);
-
-    if (reduced) {
-      finishChildTransition(card, expanding);
-      more.textContent = expanding ? 'See less' : 'See more';
-      return Promise.resolve();
-    }
-
-    // 5. tracks
-    const size = card.animate(
-      [{ width: s0.w + 'px', height: s0.h + 'px' }, { width: s1.w + 'px', height: s1.h + 'px' }],
-      { duration: M.size, delay, easing: M.ease, fill: 'both' }
-    );
-    outgoing.animate(
-      [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: `translateY(${expanding ? -6 : 6}px)` }],
-      { duration: M.out, delay, easing: MOTION.easeIn, fill: 'both' }
-    );
-    incoming.animate(
-      [{ opacity: 0, transform: `translateY(${expanding ? 8 : -6}px)` }, { opacity: 1, transform: 'translateY(0)' }],
-      { duration: M.size - M.inDelay, delay: delay + M.inDelay, easing: MOTION.easeOut, fill: 'both' }
-    );
-    swapLabel(more, expanding ? 'See less' : 'See more', delay + (expanding ? 60 : 40), false);
-
-    return size.finished.then(
-      () => finishChildTransition(card, expanding),
-      () => {} // cancelled by an interrupt: the new run owns cleanup
-    );
-  }
-
-  // hand the size back to layout (no fill left behind), hide the outgoing
-  // block, and let wires / canvas settle on the real geometry
-  function finishChildTransition(card, expanding) {
-    cancelCardAnims(card);
-    card.classList.remove('animating', 'animating--expand', 'animating--collapse');
-    card.querySelector(expanding ? '.child__preview' : '.child__doc').classList.add('hidden');
-    const led = card.querySelector('.node__led');
-    if (led) led.dataset.state = 'idle';
-    updateWires();
-    if (!expanding && typeof Canvas !== 'undefined') Canvas.fit(true); // shrink-only
+    card.appendChild(head);
+    card.appendChild(body);
+    card.appendChild(meta);
+    return card;
   }
 
   function dismissChild(card) {
-    if (nodeObserver) nodeObserver.unobserve(card);
-    card.remove();
-    setAttached($('children').childElementCount);
-    updateWires();
-    if (typeof Canvas !== 'undefined') Canvas.fit(true);
-  }
-
-  // Esc: cards already out stay, but any expanded one folds back to preview,
-  // staggered top → bottom
-  function collapseChildren() {
-    let i = 0;
-    for (const card of $('children').children) {
-      if (!card.classList.contains('expanded')) continue;
-      runChildTransition(card, false, Math.min(i, 3) * MOTION.stagger);
-      i++;
+    if (typeof Canvas !== 'undefined') {
+      Canvas.removeLinksTo(card.id);
+      Canvas.removeWindow(card);
     }
-  }
-
-  function cancelSpawn() {
-    spawnGen++;
-    spawnRound = null;
+    expanders.delete(card);
+    card.remove();
   }
 
   const delay = ms => new Promise(r => setTimeout(r, ms));
 
-  // §3.3: previous round's cards fade out together and leave; then the new
-  // cards appear one by one (~220ms apart), each sliding in over 120ms while
-  // its wire draws itself on; the last card is auto-revealed into view
+  // §spawn: previous round's windows fade out and leave; then the new cards
+  // appear one by one (~220ms apart) to the right of OUTPUT, each wired in.
+  // Spawned windows join the board: if the user has not taken over the view,
+  // fit-all re-frames; otherwise the camera stays where it is.
   async function spawnChildren(entries, round) {
     const myGen = ++spawnGen;
     spawnRound = round;
     const alive = () => myGen === spawnGen && (round === undefined || round === spawnRound);
-    const host = $('children');
-    host.classList.remove('dim');
 
-    const old = [...host.children];
+    const old = [...expanders.keys()].filter(card => card.parentNode);
     if (old.length) {
       for (const card of old) card.classList.add('leaving');
       await delay(120);
-      for (const card of old) {
-        if (nodeObserver) nodeObserver.unobserve(card);
-        card.remove();
-      }
-      updateWires();
+      for (const card of old) dismissChild(card);
     }
     if (!alive()) return;
-    setAttached(entries.length);
 
+    const out = $('node-output');
+    let colY = +out.dataset.y;
+    const colX = +out.dataset.x + 380;
     let last = null;
     const spawnOne = card => {
       card.classList.add('entering');
-      host.appendChild(card);
-      if (nodeObserver) nodeObserver.observe(card);
+      card.dataset.x = colX;
+      card.dataset.y = colY;
+      $('canvas').appendChild(card);
+      Canvas.register(card, card.classList.contains('node--image') ? 'image' : 'text');
+      Canvas.addLink('node-output', card.id);
+      colY += card.offsetHeight + 24;   // next card goes below this one
       requestAnimationFrame(() => card.classList.remove('entering'));
-      updateWires(true);
-      if (typeof Canvas !== 'undefined') Canvas.fit(true); // zoom out before the column overflows
+      if (typeof Canvas !== 'undefined') Canvas.fit(true); // re-frames only until first touch
       last = card;
     };
     for (const entry of entries) {
-      // doc card first, then one card per attachment — docs and videos are
-      // separate budgets (attachments don't count toward the show-id cap)
       const cards = [buildChild(entry)];
       for (const att of entry.attachments || []) cards.push(buildAttachmentChild(entry, att));
       for (const card of cards) {
@@ -690,6 +373,18 @@ const UI = (() => {
     if (last && alive() && typeof Canvas !== 'undefined') Canvas.reveal(last);
   }
 
+  // Esc: cards already out stay; expanded wells fold back, staggered top → bottom
+  function collapseChildren() {
+    let i = 0;
+    for (const [card, expander] of expanders) {
+      if (!card.parentNode || !expander.isOpen()) continue;
+      setTimeout(() => expander.collapse(), Math.min(i, 3) * 40);
+      i++;
+    }
+    if (outputExpander && outputExpander.isOpen()) outputExpander.collapse();
+    if (typeof Canvas !== 'undefined') Canvas.fit(true);
+  }
+
   /* ---- index overlay */
   function showIndex() {
     buildIndex();
@@ -701,7 +396,7 @@ const UI = (() => {
   }
 
   function buildIndex() {
-    $('index-title').textContent = 'INDEX · ' + Memory.entries.length + ' memories';
+    $('index-title').textContent = 'index · ' + Memory.entries.length + ' memories';
     const grid = $('index-grid');
     grid.innerHTML = '';
     for (const e of Memory.entries) {
@@ -730,11 +425,14 @@ const UI = (() => {
 
       const meta = document.createElement('footer');
       meta.className = 'node__meta';
-      meta.appendChild(metaRow('Title', e.title));
-      meta.appendChild(metaRow('Section', e.section));
+      const rows = document.createElement('div');
+      rows.className = 'meta-rows';
+      rows.appendChild(metaRow('Title', e.title));
+      rows.appendChild(metaRow('Section', e.section));
+      meta.appendChild(rows);
 
       const more = document.createElement('a');
-      more.className = 'node__more pill';
+      more.className = 'node__more';
       more.href = '#';
       more.textContent = 'See more';
 
@@ -751,13 +449,16 @@ const UI = (() => {
     }
   }
 
-  function setNodeObserver(obs) { nodeObserver = obs; }
+  function initOutput() {
+    outputExpander = initWellExpand($('node-output'));
+  }
 
   return {
-    setState, setMode, setLastQuery, buildSelfMeta,
+    setState, setMode, buildSelfMeta,
     setAnswer, startReveal, revealAnswer, finishReveal,
-    spawnChildren, cancelSpawn, collapseChildren,
-    showIndex, hideIndex, updateWires, centerGraph, setNodeObserver
+    spawnChildren, cancelSpawn: () => { spawnGen++; spawnRound = null; },
+    collapseChildren,
+    showIndex, hideIndex, initOutput
   };
 })();
 
@@ -771,12 +472,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   Face.init(portrait);
 
-  const outputBody = document.getElementById('output-body');
+  const outputText = document.getElementById('output-text');
   try {
     await Memory.load();
   } catch (err) {
     console.error(err);
-    outputBody.innerHTML = '<p class="placeholder">my memory failed to load — serve this folder over http (see README)</p>';
+    outputText.innerHTML = '<p class="placeholder">my memory failed to load — serve this folder over http (see README)</p>';
     return;
   }
 
@@ -785,36 +486,40 @@ window.addEventListener('DOMContentLoaded', async () => {
   UI.setMode(ApiBrain.enabled ? 'live' : 'static');
   UI.buildSelfMeta();
 
-  // wires: recompute on resize, font load, video metadata (face:ready), and
-  // whenever a node's box changes (panning needs no recompute — canvas space)
-  window.addEventListener('resize', () => { UI.centerGraph(); UI.updateWires(); });
-  document.addEventListener('face:ready', UI.updateWires);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(UI.updateWires);
-  const nodeObserver = new ResizeObserver(UI.updateWires);
-  ['node-input', 'node-self', 'node-output', 'children'].forEach(id => nodeObserver.observe(document.getElementById(id)));
-  UI.setNodeObserver(nodeObserver);
+  // the board: register the three windows and wire them INPUT → SELF → OUTPUT
   Canvas.init();
-  UI.centerGraph();
-  Canvas.fit(false);   // initial auto-fit (no animation on load)
-  UI.updateWires();
+  Canvas.register(document.getElementById('node-input'), 'text');
+  Canvas.register(document.getElementById('node-self'), 'image');
+  Canvas.register(document.getElementById('node-output'), 'text');
+  Canvas.addLink('node-input', 'node-self', 'wire-in');
+  Canvas.addLink('node-self', 'node-output', 'wire-out');
+  UI.initOutput();
+  Canvas.fitAll(false);
 
   const input = document.getElementById('query');
 
-  // mobile: textarea shrinks to 2 rows
+  // wheel inside the textarea scrolls it, never zooms the board
+  input.addEventListener('wheel', ev => ev.stopPropagation(), { passive: true });
+
+  // small screens: textarea shrinks to 2 rows
   const mqMobile = window.matchMedia('(max-width: 699px)');
   const applyRows = () => { input.rows = mqMobile.matches ? 2 : 4; };
   mqMobile.addEventListener('change', applyRows);
   applyRows();
 
+  const send = () => {
+    const q = input.value;
+    input.value = '';
+    Agent.handle(q);
+  };
   input.addEventListener('keydown', ev => {
     if (ev.key === 'Enter' && !ev.shiftKey) {
       if (ev.isComposing || ev.keyCode === 229) return; // IME: Enter picks a candidate, don't send
       ev.preventDefault();
-      const q = input.value;
-      input.value = '';
-      Agent.handle(q);
+      send();
     }
   });
+  document.getElementById('send-btn').addEventListener('click', send);
 
   // global keys: Esc closes overlays & stops speech; "/" focuses the input
   window.addEventListener('keydown', ev => {
@@ -822,12 +527,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       UI.hideIndex();
       Agent.cancel();
       return;
-    }
-    // zoom / home shortcuts (desktop only, never while typing)
-    if (!/^(TEXTAREA|INPUT)$/.test(ev.target.tagName) && window.innerWidth >= 700) {
-      if (ev.key === '=' || ev.key === '+') { ev.preventDefault(); Canvas.zoomBy(1.2); return; }
-      if (ev.key === '-' || ev.key === '_') { ev.preventDefault(); Canvas.zoomBy(1 / 1.2); return; }
-      if (ev.key === '0') { ev.preventDefault(); Canvas.home(true); return; }
     }
     if (ev.key === '/' && !ev.metaKey && !ev.ctrlKey &&
         !/^(TEXTAREA|INPUT)$/.test(ev.target.tagName)) {
@@ -848,11 +547,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         onEnd: () => {
           micBtn.classList.remove('listening');
           Agent.setState('idle');
-          if (input.value.trim()) {
-            const q = input.value;
-            input.value = '';
-            Agent.handle(q);
-          }
+          if (input.value.trim()) send();
         }
       });
     });

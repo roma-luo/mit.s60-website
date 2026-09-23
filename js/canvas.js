@@ -1,346 +1,475 @@
-/* Canvas — pannable, zoomable, auto-fitting workspace with inertial motion.
+/* Canvas — the node-board engine (ported from reference/slop-instance.html).
  *
- * Same public API as before:
+ * A fixed full-viewport stage; every window is a free body on the board.
+ * Windows drag with a viscous feel, the board pans by dragging empty space
+ * and zooms with the wheel anchored at the cursor. Ports on the meta rows
+ * wire windows together; wires follow translate/rotate/scale every frame.
+ *
+ * Public API (kept compatible with the previous canvas driver):
  *   Canvas.init()
+ *   Canvas.register(el, kind)     — add a board window (spawned children)
+ *   Canvas.removeWindow(el)       — drop it and its wires/ports
+ *   Canvas.addLink(fromId, toId)  — wire from the right edge of from to left of to
+ *   Canvas.removeLinksTo(id)
+ *   Canvas.setFlow(id, on)        — dash-flow a wire ('wire-in' | 'wire-out')
+ *   Canvas.reflow(ms)             — keep wires attached during an expand
+ *   Canvas.reveal(el)             — glide the view so a window is on screen
+ *   Canvas.fit(animate)           — fit-all until the user first touches the board
+ *   Canvas.home(animate)          — fit-all on demand
+ *   Canvas.zoomBy(factor, cx, cy) — zoom about a screen point (default centre)
  *   Canvas.pan(dx, dy)
- *   Canvas.fit(animate)        — shrink-only auto-fit (animate=false snaps)
- *   Canvas.reveal(el)          — minimal glide that brings el into view
  *   Canvas.setOffset(x, y, animate)
- *   Canvas.get() → { x, y, scale, tx, ty, tScale }
- *   Canvas.zoomBy(factor, cx, cy)   NEW — for buttons / keyboard
- *
- * What changed vs. the previous version (all "feel" fixes):
- *  1. Easing is time-based (exp decay, TAU ms), not per-frame — identical
- *     speed on 60 / 120 / 144 Hz displays.
- *  2. Scale eases in LOG space, so zoom in and zoom out feel symmetric.
- *  3. Wheel anchoring is computed against the TARGET state, not the mid-glide
- *     current state — rapid notches compound exactly like an instant zoom,
- *     with no drift.
- *  4. Trackpad two-finger scroll = pan, pinch / ctrl+wheel = zoom, mouse
- *     wheel = zoom. Shift+wheel pans horizontally.
- *  5. When the graph is smaller than the viewport it is no longer slammed to
- *     the top-left (old clamp returned 0) — the anchor point is honoured and
- *     the graph just can't leave the viewport. Double-click centres it.
- *  6. Two-finger touch pinch/pan for tablets ≥ 700px.
- *  7. Wheel over an expanded doc only stays "internal" if the doc actually
- *     scrolls; otherwise it zooms/pans like everywhere else (no dead zone).
+ *   Canvas.get() → { x, y, scale }
  */
 const Canvas = (() => {
-  const FLOOR = 0.45;      // auto-fit never zooms out beyond this
-  const MARGIN = 0.04;     // viewport margin for auto-fit
-  const ZOOM_MIN = 0.3;
-  const ZOOM_MAX = 2.5;
-  const TAU = 90;          // ms — time constant of the glide (lower = snappier)
-  const SNAP = 1e-3;
-  const FLING_T = 0.22;    // s — fling distance = velocity × this
-  const FLING_MIN = 60;    // px/s
-  const VEL_WINDOW = 100;  // ms of pointer history for fling velocity
-  const WHEEL_ZOOM = 1.12; // per 100px of mouse-wheel delta
-  const PINCH_ZOOM = 1.01; // per 1px of ctrl-wheel (trackpad pinch) delta
+  let stage, canvas, pct;
+  const NS = 'http://www.w3.org/2000/svg';
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  let el = null;
-  let graph = null;
-  // current (rendered)
-  let ox = 0, oy = 0, scale = 1;
-  // target
-  let tOx = 0, tOy = 0, tScale = 1;
-  let rafId = null;
-  let lastT = 0;
+  /* ---- window feel (per 60fps frame, applied frame-rate independently) */
+  const FOLLOW = calm ? 1 : 0.12;
+  const BREAK  = calm ? 0 : 5;
+  const TILT   = calm ? 0 : 0.10, TILT_MAX = 1.4;
+  const LIFT   = calm ? 1 : 1.014;
+  const EASE   = 0.2;
 
-  // drag / pinch state
-  const pointers = new Map(); // pointerId → {x, y}
-  let dragging = false;
-  let startX = 0, startY = 0, baseX = 0, baseY = 0;
-  let pinch = null;          // { dist, cx, cy, scale, ox, oy }
-  const moves = [];
+  /* ---- view */
+  const ZMIN = 0.25, ZMAX = 4, ZSTEP = 1.25;
+  const VIEW_EASE = calm ? 1 : 0.2;
 
-  const enabled = () => window.innerWidth >= 700;
-  const clampScale = s => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s));
+  /* port rule — the upper hole always connects to text, the lower hole
+     always connects to an image (CLAUDE.md R1) */
+  const PORT = { text: 0, image: 1 };
 
-  /* ------------------------------------------------------------ init */
-  function init() {
-    el = document.getElementById('canvas');
-    graph = document.getElementById('graph');
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-    el.addEventListener('pointerdown', onPointerDown);
-    el.addEventListener('pointermove', onPointerMove);
-    el.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('pointercancel', onPointerUp);
-    el.addEventListener('wheel', onWheel, { passive: false });
-    el.addEventListener('dblclick', ev => {
-      if (!enabled() || ev.target.closest('.node')) return;
-      home(true);
+  let nodes = [];
+  let byId = {};
+  let z = 0;
+  const links = [];
+  let dots = [];
+
+  /* ============================ registry ============================ */
+
+  function layer() {
+    const l = document.createElementNS(NS, 'svg');
+    l.setAttribute('class', 'layer');
+    l.setAttribute('aria-hidden', 'true');
+    return canvas.appendChild(l);
+  }
+
+  function apply(n) {
+    n.el.style.transform = `translate(${n.x}px, ${n.y}px) rotate(${n.r}deg) scale(${n.s})`;
+  }
+
+  // port position in canvas space, following translate · rotate · scale
+  function portPos(id, row, side) {
+    const n = byId[id], el = n.el;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const rowEl = el.querySelectorAll('.meta-row')[row];
+    let ly = rowEl.offsetHeight / 2 + el.clientTop, e = rowEl;
+    while (e && e !== el) { ly += e.offsetTop; e = e.offsetParent; }
+    const lx = side === 'right' ? w : 0;
+    const a = n.r * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
+    const dx = (lx - w / 2) * n.s, dy = (ly - h / 2) * n.s;
+    return { x: n.x + w / 2 + dx * c - dy * sn, y: n.y + h / 2 + dx * sn + dy * c };
+  }
+
+  function makePorts(n) {
+    n.ports = layer();
+    n.ports.style.zIndex = 2 * n.z + 1;
+    n.el.querySelectorAll('.meta-row').forEach((_, i) => {
+      ['left', 'right'].forEach(side => {
+        const on = links.some(l =>
+          (l.from[0] === n.el.id && l.from[1] === i && l.from[2] === side) ||
+          (l.to[0] === n.el.id && l.to[1] === i && l.to[2] === side));
+        const c = n.ports.appendChild(document.createElementNS(NS, 'circle'));
+        c.setAttribute('r', on ? 2.6 : 2);
+        c.setAttribute('class', on ? 'port is-linked' : 'port');
+        dots.push({ c, id: n.el.id, i, side });
+      });
     });
-    window.addEventListener('resize', () => {
-      [tOx, tOy] = clampXY(tOx, tOy, tScale);
-      [ox, oy] = clampXY(ox, oy, scale);
-      apply();
-      poke();
+  }
+
+  function linkPorts(n) {
+    // restyle the port dots affected by a link touching this window
+    if (!n.ports) return;
+    dots.forEach(d => {
+      if (d.id !== n.el.id) return;
+      const on = links.some(l =>
+        (l.from[0] === d.id && l.from[1] === d.i && l.from[2] === d.side) ||
+        (l.to[0] === d.id && l.to[1] === d.i && l.to[2] === d.side));
+      d.c.setAttribute('r', on ? 2.6 : 2);
+      d.c.setAttribute('class', on ? 'port is-linked' : 'port');
     });
   }
 
-  /* ------------------------------------------------------- pointers */
-  function onPointerDown(ev) {
-    if (!enabled()) return;
-    if (ev.pointerType === 'mouse' && ev.button !== 0) return;
-    // pan starts on empty space only; touch may start anywhere so pinch works
-    if (ev.pointerType !== 'touch' && ev.target.closest('.node')) return;
-
-    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-    el.setPointerCapture(ev.pointerId);
-
-    if (pointers.size === 2) {           // second finger → pinch
-      dragging = false;
-      el.classList.remove('panning');
-      const [a, b] = [...pointers.values()];
-      pinch = {
-        dist: Math.hypot(b.x - a.x, b.y - a.y),
-        cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2,
-        scale: tScale, ox: tOx, oy: tOy
-      };
-      settleNow();
-      return;
-    }
-    if (pointers.size > 2) return;
-
-    // single pointer → pan (touch on a node only pans if it's not a scrollable)
-    if (ev.pointerType === 'touch' && ev.target.closest('.node')) return;
-    dragging = true;
-    moves.length = 0;
-    track(ev);
-    settleNow();                          // kill in-flight fling
-    startX = ev.clientX; startY = ev.clientY;
-    baseX = ox; baseY = oy;
-    el.classList.add('panning');
+  /* stacking — window k at z 2k, its ports at 2k+1; a wire belongs to the
+     window it feeds and shares that layer (CLAUDE.md R2) */
+  function restack() {
+    nodes.forEach(n => {
+      n.el.style.zIndex = 2 * n.z;
+      if (n.ports) n.ports.style.zIndex = 2 * n.z + 1;
+    });
+    links.forEach(l => { l.svg.style.zIndex = 2 * byId[l.to[0]].z + 1; });
   }
 
-  function onPointerMove(ev) {
-    if (!pointers.has(ev.pointerId)) return;
-    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-
-    if (pinch && pointers.size >= 2) {
-      const [a, b] = [...pointers.values()];
-      const dist = Math.hypot(b.x - a.x, b.y - a.y);
-      const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
-      const s = clampScale(pinch.scale * (dist / Math.max(1, pinch.dist)));
-      // keep the layout point under the initial midpoint pinned, then pan by
-      // the midpoint's travel
-      const px = (pinch.cx - pinch.ox) / pinch.scale;
-      const py = (pinch.cy - pinch.oy) / pinch.scale;
-      set(cx - px * s, cy - py * s, s);
-      return;
-    }
-    if (!dragging) return;
-    track(ev);
-    set(baseX + ev.clientX - startX, baseY + ev.clientY - startY, scale); // 1:1
+  function draw() {
+    links.forEach(l => {
+      const a = portPos(...l.from), b = portPos(...l.to);
+      const dx = Math.max(48, Math.abs(b.x - a.x) * 0.55);
+      l.path.setAttribute('d',
+        `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`);
+    });
+    dots.forEach(d => {
+      const q = portPos(d.id, d.i, d.side);
+      d.c.setAttribute('cx', q.x);
+      d.c.setAttribute('cy', q.y);
+    });
   }
 
-  function onPointerUp(ev) {
-    pointers.delete(ev.pointerId);
-    if (pinch) {
-      if (pointers.size < 2) pinch = null;
-      return;
-    }
-    if (!dragging) return;
-    dragging = false;
-    el.classList.remove('panning');
-    if (moves.length >= 2) {
-      const first = moves[0], last = moves[moves.length - 1];
-      const dt = (last.t - first.t) / 1000;
-      if (dt > 0.01) {
-        const vx = (last.x - first.x) / dt;
-        const vy = (last.y - first.y) / dt;
-        if (Math.hypot(vx, vy) > FLING_MIN) {
-          [tOx, tOy] = clampXY(ox + vx * FLING_T, oy + vy * FLING_T, scale);
-          poke();
-          return;
-        }
+  function register(el, kind) {
+    if (byId[el.id]) return byId[el.id];
+    el.dataset.kind = kind;
+    const n = {
+      el,
+      x: +el.dataset.x || 0, y: +el.dataset.y || 0,
+      tx: +el.dataset.x || 0, ty: +el.dataset.y || 0,
+      r: 0, s: 1, ts: 1, lever: 0, z: ++z
+    };
+    nodes.push(n);
+    byId[el.id] = n;
+    makePorts(n);
+    restack();
+    apply(n);
+    draw();
+    return n;
+  }
+
+  function removeWindow(el) {
+    const n = byId[el.id];
+    if (!n) return;
+    for (let i = links.length - 1; i >= 0; i--) {
+      if (links[i].from[0] === el.id || links[i].to[0] === el.id) {
+        links[i].svg.remove();
+        links.splice(i, 1);
       }
     }
-    tOx = ox; tOy = oy;
+    dots = dots.filter(d => {
+      if (d.id !== el.id) return true;
+      d.c.remove();
+      return false;
+    });
+    if (n.ports) n.ports.remove();
+    nodes = nodes.filter(m => m !== n);
+    delete byId[el.id];
+    draw();
   }
 
-  function track(ev) {
-    const now = performance.now();
-    moves.push({ t: now, x: ev.clientX, y: ev.clientY });
-    while (moves.length && now - moves[0].t > VEL_WINDOW) moves.shift();
+  function addLink(fromId, toId, pathId) {
+    const l = { a: fromId, b: toId };
+    l.from = [fromId, PORT[byId[toId].el.dataset.kind], 'right'];
+    l.to = [toId, PORT[byId[fromId].el.dataset.kind], 'left'];
+    l.svg = layer();
+    l.path = l.svg.appendChild(document.createElementNS(NS, 'path'));
+    l.path.setAttribute('class', 'wire');
+    if (pathId) l.path.id = pathId;
+    links.push(l);
+    linkPorts(byId[fromId]);
+    linkPorts(byId[toId]);
+    restack();
+    draw();
   }
 
-  /* ---------------------------------------------------------- wheel */
-  function onWheel(ev) {
-    if (!enabled()) return;
-    // let genuinely scrollable inner content scroll itself
-    const scroller = ev.target.closest('.child__doc, #query');
-    if (scroller && scroller.scrollHeight > scroller.clientHeight + 1) return;
-    ev.preventDefault();
-
-    // Firefox line mode → approx pixels
-    const dx = ev.deltaMode === 1 ? ev.deltaX * 16 : ev.deltaX;
-    const dy = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
-
-    // pinch (browsers report trackpad pinch as ctrl+wheel) → zoom, fine grain
-    if (ev.ctrlKey || ev.metaKey) {
-      zoomBy(Math.pow(PINCH_ZOOM, -dy), ev.clientX, ev.clientY);
-      return;
+  function removeLinksTo(id) {
+    for (let i = links.length - 1; i >= 0; i--) {
+      if (links[i].to[0] !== id) continue;
+      const from = links[i].from[0];
+      links[i].svg.remove();
+      links.splice(i, 1);
+      linkPorts(byId[from]);
     }
-    // trackpad two-finger scroll: small / fractional deltas or any deltaX
-    const trackpad = dx !== 0 || (Math.abs(dy) < 50 && !Number.isInteger(dy)) || Math.abs(dy) < 20;
-    if (trackpad) {
-      settleNow();
-      set(ox - dx, oy - dy, scale);
-      return;
-    }
-    if (ev.shiftKey) {                    // mouse wheel + shift → horizontal pan
-      retarget(tOx - dy, tOy, tScale, false);
-      return;
-    }
-    // mouse wheel → zoom around cursor
-    zoomBy(Math.pow(WHEEL_ZOOM, -dy / 100), ev.clientX, ev.clientY);
+    draw();
   }
 
-  // zoom the TARGET by factor, keeping the layout point under (cx, cy) fixed.
-  // Anchoring against the target (not the mid-glide current) means rapid
-  // notches compound exactly like instant zooms — no drift.
-  function zoomBy(factor, cx, cy) {
-    if (cx === undefined) { cx = window.innerWidth / 2; cy = window.innerHeight / 2; }
-    const next = clampScale(tScale * factor);
-    if (next === tScale) return;
-    const px = (cx - tOx) / tScale;
-    const py = (cy - tOy) / tScale;
-    tScale = next;
-    [tOx, tOy] = clampXY(cx - px * next, cy - py * next, next);
-    poke();
+  function setFlow(id, on) {
+    links.forEach(l => { if (l.path.id === id) l.path.classList.toggle('flow', on); });
   }
 
-  /* ------------------------------------------------------- rAF loop */
-  function tick(now) {
-    const dt = Math.min(64, now - (lastT || now)); // cap after tab switch
-    lastT = now;
-    const k = 1 - Math.exp(-dt / TAU);            // frame-rate independent
+  /* ============================ the view ============================ */
+  const view = { x: 0, y: 0, s: 1, tx: 0, ty: 0, ts: 1 };
 
-    // ease scale in log space, position linearly
-    const ls = Math.log(scale), lt = Math.log(tScale);
-    scale = Math.exp(ls + (lt - ls) * k);
-    ox += (tOx - ox) * k;
-    oy += (tOy - oy) * k;
+  function applyView() {
+    canvas.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
+    if (pct) pct.textContent = Math.round(view.ts * 100) + '%';
+  }
+  const snapView = () => { view.x = view.tx; view.y = view.ty; view.s = view.ts; applyView(); };
+  const toCanvas = (cx, cy) => {
+    const r = stage.getBoundingClientRect();
+    return { x: (cx - r.left - view.x) / view.s, y: (cy - r.top - view.y) / view.s };
+  };
 
-    if (Math.abs(tScale - scale) < SNAP && Math.abs(tOx - ox) < SNAP && Math.abs(tOy - oy) < SNAP) {
-      scale = tScale; ox = tOx; oy = tOy;
-      apply();
-      rafId = null;
-      return;
-    }
-    apply();
-    rafId = requestAnimationFrame(tick);
+  // zoom to s keeping the canvas point under screen (sx, sy) where it is;
+  // x, y and s ease with the same factor, so the anchor holds all the way
+  function zoomTo(s, sx, sy, animate) {
+    const r = stage.getBoundingClientRect();
+    const px = sx - r.left, py = sy - r.top;
+    const cx = (px - view.tx) / view.ts, cy = (py - view.ty) / view.ts;
+    view.ts = clamp(s, ZMIN, ZMAX);
+    view.tx = px - cx * view.ts;
+    view.ty = py - cy * view.ts;
+    if (animate) kick(); else snapView();
+  }
+  const zoomBy = (f, cx, cy) => {
+    const r = stage.getBoundingClientRect();
+    zoomTo(view.ts * f,
+      cx === undefined ? r.left + r.width / 2 : cx,
+      cy === undefined ? r.top + r.height / 2 : cy, true);
+  };
+
+  function panView(dx, dy) {
+    view.x += dx; view.y += dy; view.tx += dx; view.ty += dy;
+    applyView();
   }
 
-  function poke() {
-    if (!rafId) { lastT = 0; rafId = requestAnimationFrame(tick); }
+  function fitAll(animate) {
+    const r = stage.getBoundingClientRect();
+    const pad = 40, bar = 64;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    nodes.forEach(n => {
+      x0 = Math.min(x0, n.tx); y0 = Math.min(y0, n.ty);
+      x1 = Math.max(x1, n.tx + n.el.offsetWidth); y1 = Math.max(y1, n.ty + n.el.offsetHeight);
+    });
+    if (x0 === Infinity) return;
+    const s = clamp(Math.min((r.width - 2 * pad) / (x1 - x0),
+                             (r.height - 2 * pad - bar) / (y1 - y0)), ZMIN, 1);
+    view.ts = s;
+    view.tx = (r.width - (x1 - x0) * s) / 2 - x0 * s;
+    view.ty = (r.height - bar - (y1 - y0) * s) / 2 - y0 * s;
+    if (animate) kick(); else snapView();
   }
 
-  function apply() {
-    el.style.transform = `translate3d(${ox}px, ${oy}px, 0) scale(${scale})`;
-  }
-
-  // current and target jump together (drag tracking, snaps)
-  function set(x, y, s) {
-    scale = s;
-    [ox, oy] = clampXY(x, y, s);
-    tScale = scale; tOx = ox; tOy = oy;
-    apply();
-  }
-
-  // targets collapse onto the current state (stops any glide)
-  function settleNow() { tScale = scale; tOx = ox; tOy = oy; }
-
-  function retarget(x, y, s, snap) {
-    tScale = clampScale(s);
-    [tOx, tOy] = clampXY(x, y, tScale);
-    if (snap) set(tOx, tOy, tScale);
-    else poke();
-  }
-
-  /* ------------------------------------------------------- geometry */
-  function contentSize() {
-    let w = 0, h = 0;
-    for (const child of graph.children) {
-      w = Math.max(w, child.offsetLeft + child.offsetWidth);
-      h = Math.max(h, child.offsetTop + child.offsetHeight);
-    }
-    const cs = getComputedStyle(graph);
-    const pl = parseFloat(cs.paddingLeft) || 0;
-    const pr = parseFloat(cs.paddingRight) || 0;
-    const pb = parseFloat(cs.paddingBottom) || 0;
-    // content only: the centering padding-left is not content
-    return { w: w - pl + pr, h: h + pb };
-  }
-
-  function fitScale() {
-    if (!enabled()) return 1;
-    const availW = window.innerWidth * (1 - MARGIN);
-    const availH = window.innerHeight * (1 - MARGIN);
-    const cs = contentSize();
-    return Math.max(FLOOR, Math.min(1, availW / cs.w, availH / cs.h));
-  }
-
-  // The graph may never leave the viewport. Larger than viewport: edges can't
-  // reveal empty space. Smaller than viewport: it may sit anywhere inside —
-  // this is what keeps zoom-out anchored under the cursor instead of jumping
-  // to the top-left corner.
-  function clampXY(x, y, s) {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const GW = graph.offsetWidth * s, GH = graph.offsetHeight * s;
-    const gl = graph.offsetLeft * s, gt = graph.offsetTop * s;
-    const ax = -gl, bx = vw - gl - GW;
-    const ay = -gt, by = vh - gt - GH;
-    return [
-      Math.min(Math.max(ax, bx), Math.max(Math.min(ax, bx), x)),
-      Math.min(Math.max(ay, by), Math.max(Math.min(ay, by), y))
-    ];
-  }
-
-  // glide to the fitted view, centred in the viewport
-  function home(animate) {
-    const s = fitScale();
-    const cs = contentSize();
-    const pl = parseFloat(getComputedStyle(graph).paddingLeft) || 0;
-    const x = (window.innerWidth - cs.w * s) / 2 - (graph.offsetLeft + pl) * s;
-    const y = (window.innerHeight - cs.h * s) / 2 - graph.offsetTop * s;
-    retarget(x, y, s, animate === false);
-  }
-
-  function fit(animate) {
-    if (!enabled()) return;
-    const target = fitScale();
-    // shrink-only: never force the scale back up after a manual zoom-out
-    if (target < tScale) retarget(tOx, tOy, target, animate === false);
-    else retarget(tOx, tOy, tScale, animate === false); // just re-clamp
-  }
-
-  function pan(dx, dy) { set(ox + dx, oy + dy, scale); }
-  function setOffset(x, y, animate) { retarget(x, y, scale, !animate); }
-  function get() { return { x: ox, y: oy, scale, tx: tOx, ty: tOy, tScale }; }
-
-  function layoutRect(target) {
-    let l = 0, t = 0, n = target;
-    while (n && n !== el) { l += n.offsetLeft; t += n.offsetTop; n = n.offsetParent; }
-    return { l, t, w: target.offsetWidth, h: target.offsetHeight };
-  }
-
+  // glide the view so the window's final footprint is inside the viewport
   function reveal(target) {
-    if (!enabled() || !target) return;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const r = layoutRect(target);
-    const margin = vw * 0.06;
-    const left = tOx + r.l * tScale, right = tOx + (r.l + r.w) * tScale;
-    const top = tOy + r.t * tScale, bottom = tOy + (r.t + r.h) * tScale;
+    const n = byId[target.id];
+    if (!n) return;
+    const r = stage.getBoundingClientRect();
+    const margin = Math.min(60, r.width * 0.06);
+    const w = n.el.offsetWidth * view.ts, h = n.el.offsetHeight * view.ts;
+    const left = view.tx + n.tx * view.ts, top = view.ty + n.ty * view.ts;
     let dx = 0, dy = 0;
-    if (right > vw - margin) dx = (vw - margin) - right;
-    else if (left < 0) dx = -left;
-    if (bottom > vh) dy = vh - bottom;
-    else if (top < 0) dy = -top;
-    if (dx || dy) retarget(tOx + dx, tOy + dy, tScale, false);
+    if (left + w > r.width - margin) dx = (r.width - margin) - (left + w);
+    else if (left < margin) dx = margin - left;
+    if (top + h > r.height - margin) dy = (r.height - margin) - (top + h);
+    else if (top < margin) dy = margin - top;
+    if (dx || dy) {
+      view.tx += dx;
+      view.ty += dy;
+      kick();
+    }
   }
 
-  return { init, pan, fit, reveal, setOffset, get, zoomBy, home };
+  /* ==================== pointers: drag / pan / pinch ==================== */
+  let touched = false;
+  const pts = new Map();
+  let drag = null, panning = null, pinch = null;
+
+  function endWindowDrag() {
+    if (!drag) return;
+    drag.n.el.classList.remove('is-dragging');
+    drag.n.ts = 1;
+    drag = null;                       // no throw: a viscous medium eats momentum
+    kick();
+  }
+  function startPinch() {
+    endWindowDrag();
+    panning = null;
+    stage.classList.remove('is-panning');
+    const [a, b] = [...pts.values()];
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: view.s, c0: toCanvas(mid.x, mid.y) };
+  }
+
+  function onPointerDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.target.closest('.btn, textarea, .node__close')) return; // buttons / text are not drag handles
+    touched = true;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+    if (pts.size === 2) { startPinch(); return; }
+    if (pts.size > 2) return;
+
+    const el = e.target.closest('.node');
+    if (el && byId[el.id]) {
+      const n = byId[el.id], p = toCanvas(e.clientX, e.clientY);
+      drag = { n, id: e.pointerId, ox: p.x - n.tx, oy: p.y - n.ty,
+               sx: e.clientX, sy: e.clientY, stuck: BREAK > 0 };
+      n.lever = clamp((el.offsetHeight / 2 - drag.oy) / (el.offsetHeight / 2), -1, 1);
+      n.z = ++z;
+      restack();
+      el.classList.add('is-dragging');
+      n.ts = LIFT;
+      kick();
+    } else {
+      panning = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      stage.classList.add('is-panning');
+    }
+  }
+
+  function onPointerMove(e) {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinch && pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const r = stage.getBoundingClientRect();
+      const s = clamp(pinch.s0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0, ZMIN, ZMAX);
+      view.ts = s;
+      view.tx = mid.x - r.left - pinch.c0.x * s;
+      view.ty = mid.y - r.top - pinch.c0.y * s;
+      snapView();
+      return;
+    }
+    if (panning && e.pointerId === panning.id) {
+      panView(e.clientX - panning.x, e.clientY - panning.y);
+      panning.x = e.clientX;
+      panning.y = e.clientY;
+      return;
+    }
+    if (drag && e.pointerId === drag.id) {
+      if (drag.stuck) {
+        if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < BREAK) return;
+        drag.stuck = false;              // breaks free — the lag absorbs the jump
+      }
+      const p = toCanvas(e.clientX, e.clientY);
+      drag.n.tx = p.x - drag.ox;
+      drag.n.ty = p.y - drag.oy;
+      kick();
+    }
+  }
+
+  const onPointerUp = e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    if (pinch && pts.size < 2) pinch = null;
+    if (drag && e.pointerId === drag.id) endWindowDrag();
+    if (panning && e.pointerId === panning.id) {
+      panning = null;
+      stage.classList.remove('is-panning');
+    }
+  };
+
+  /* ============================ the loop ============================ */
+  let raf = 0, last = 0, reflowUntil = 0;
+  function kick() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); } }
+
+  function tick(t) {
+    const dt = Math.min(0.05, (t - last) / 1000) || 1 / 60;
+    last = t;
+    const f  = 1 - Math.pow(1 - FOLLOW, dt * 60);
+    const fe = 1 - Math.pow(1 - EASE, dt * 60);
+    const fv = 1 - Math.pow(1 - VIEW_EASE, dt * 60);
+    let busy = false;
+
+    for (const n of nodes) {
+      const px = n.x;
+      n.x += (n.tx - n.x) * f;
+      n.y += (n.ty - n.y) * f;
+      const vx = (n.x - px) / (dt * 60);
+      n.r += (clamp(vx * TILT * n.lever, -TILT_MAX, TILT_MAX) - n.r) * fe;
+      n.s += (n.ts - n.s) * fe;
+      const settled = Math.abs(n.tx - n.x) < 0.05 && Math.abs(n.ty - n.y) < 0.05 &&
+                      Math.abs(n.r) < 0.005 && Math.abs(n.ts - n.s) < 0.0004;
+      if (settled) { n.x = n.tx; n.y = n.ty; n.r = 0; n.s = n.ts; } else busy = true;
+      apply(n);
+    }
+
+    if (view.x !== view.tx || view.y !== view.ty || view.s !== view.ts) {
+      view.x += (view.tx - view.x) * fv;
+      view.y += (view.ty - view.y) * fv;
+      view.s += (view.ts - view.s) * fv;
+      if (Math.abs(view.tx - view.x) < 0.05 && Math.abs(view.ty - view.y) < 0.05 &&
+          Math.abs(view.ts - view.s) < 0.0002) { view.x = view.tx; view.y = view.ty; view.s = view.ts; }
+      else busy = true;
+      applyView();
+    }
+
+    if (t < reflowUntil) busy = true;   // a well is changing height: ports move
+    draw();
+    raf = (busy || drag) ? requestAnimationFrame(tick) : 0;
+  }
+
+  /* ============================ init ============================ */
+  function init() {
+    stage = document.getElementById('stage');
+    canvas = document.getElementById('canvas');
+    pct = document.getElementById('pct');
+    if (!stage || !canvas) return;
+
+    stage.addEventListener('pointerdown', onPointerDown);
+    stage.addEventListener('pointermove', onPointerMove);
+    stage.addEventListener('pointerup', onPointerUp);
+    stage.addEventListener('pointercancel', onPointerUp);
+
+    // wheel = zoom, anchored on the cursor; a mouse notch eases, trackpad
+    // scroll / ctrl+pinch tracks directly
+    stage.addEventListener('wheel', e => {
+      e.preventDefault();
+      touched = true;
+      const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+      const pinchW = e.ctrlKey || e.metaKey;
+      const notch = !pinchW && Math.abs(dy) >= 50;
+      const k = pinchW ? 0.01 : 0.0015;   // one notch (deltaY 100): ×1.16 in, ×0.86 out
+      zoomTo(view.ts * Math.exp(-dy * k), e.clientX, e.clientY, notch);
+    }, { passive: false });
+
+    // Safari desktop pinch fires gesture events instead of ctrl+wheel
+    let g0 = null;
+    stage.addEventListener('gesturestart', e => { e.preventDefault(); g0 = pts.size ? null : view.ts; });
+    stage.addEventListener('gesturechange', e => {
+      e.preventDefault();
+      if (g0 != null) zoomTo(g0 * e.scale, e.clientX, e.clientY, false);
+    });
+    stage.addEventListener('gestureend', e => { e.preventDefault(); g0 = null; });
+
+    const zoombar = document.querySelector('.zoombar');
+    if (zoombar) zoombar.addEventListener('click', e => {
+      const b = e.target.closest('[data-zoom]');
+      if (!b) return;
+      touched = true;
+      const k = b.dataset.zoom;
+      if (k === 'in') zoomBy(ZSTEP);
+      if (k === 'out') zoomBy(1 / ZSTEP);
+      if (k === 'fit') { touched = false; fitAll(true); }
+    });
+    addEventListener('keydown', e => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); touched = true; zoomBy(ZSTEP); }
+      else if (e.key === '-') { e.preventDefault(); touched = true; zoomBy(1 / ZSTEP); }
+      else if (e.key === '0') { e.preventDefault(); touched = false; fitAll(true); }
+    });
+
+    // keep wires attached whenever a window's box changes (well expand, spawn)
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => draw());
+      ro.observe(canvas);
+    }
+
+    const settle = () => { draw(); if (!touched) fitAll(false); };
+    addEventListener('load', settle);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
+  }
+
+  return {
+    init, register, removeWindow, addLink, removeLinksTo, setFlow,
+    reveal, fitAll, zoomBy,
+    fit: animate => { if (!touched) fitAll(animate); },
+    home: animate => { touched = false; fitAll(animate); },
+    reflow: ms => { reflowUntil = performance.now() + ms; kick(); },
+    pan: panView,
+    setOffset: (x, y, animate) => { view.tx = x; view.ty = y; if (animate) kick(); else snapView(); },
+    get: () => ({ x: view.x, y: view.y, scale: view.s, tx: view.tx, ty: view.ty, tScale: view.ts }),
+    kick
+  };
 })();

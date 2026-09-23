@@ -48,7 +48,6 @@ const Agent = (() => {
     const myRound = round;
     let res = null;
     setState('thinking');
-    UI.setLastQuery(query);
 
     const liveBrain = ApiBrain.enabled ? ApiBrain : null;
     if (liveBrain) {
