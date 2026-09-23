@@ -116,6 +116,7 @@ const UI = (() => {
     meta.appendChild(metaRow('Artifact', opts.entry ? opts.entry.title : 'answer'));
     meta.appendChild(metaRow('Type', 'text / plain'));
 
+    if (typeof Canvas !== 'undefined') Canvas.refreshPorts($('node-output'));
     if (outputExpander) outputExpander.measure();
   }
 
@@ -484,7 +485,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (ApiBrain.enabled) console.info('live brain mode: api (deepseek via /api/chat, recall via /api/recall)');
 
   UI.setMode(ApiBrain.enabled ? 'live' : 'static');
-  UI.buildSelfMeta();
+  await UI.buildSelfMeta();   // both meta rows must exist before ports are made
 
   // the board: register the three windows and wire them INPUT → SELF → OUTPUT
   Canvas.init();

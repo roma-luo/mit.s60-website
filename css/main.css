@@ -382,9 +382,13 @@ html, body, * { scrollbar-width: none; }
   position: absolute;
   left: 0;
   top: 0;
+  width: 4000px;
+  height: 3000px;
   transform-origin: 0 0;
   /* R3: no will-change here or on the windows — a promoted layer is
-     rasterised once and then scaled as a bitmap, which blurs zoomed text */
+     rasterised once and then scaled as a bitmap, which blurs zoomed text.
+     the canvas needs a real size: an svg layer at 0x0 never paints, so
+     wires and ports vanish even with overflow: visible. */
 }
 .canvas > .node {
   position: absolute;

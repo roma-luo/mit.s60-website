@@ -66,9 +66,18 @@ const Canvas = (() => {
   function portPos(id, row, side) {
     const n = byId[id], el = n.el;
     const w = el.offsetWidth, h = el.offsetHeight;
-    const rowEl = el.querySelectorAll('.meta-row')[row];
-    let ly = rowEl.offsetHeight / 2 + el.clientTop, e = rowEl;
-    while (e && e !== el) { ly += e.offsetTop; e = e.offsetParent; }
+    const rows = el.querySelectorAll('.meta-row');
+    // never let a missing row kill the frame loop: clamp to what exists,
+    // fall back to the window edge centre when there are no rows yet
+    const rowEl = rows[Math.min(row, rows.length - 1)] || null;
+    let ly;
+    if (rowEl) {
+      ly = rowEl.offsetHeight / 2 + el.clientTop;
+      let e = rowEl;
+      while (e && e !== el) { ly += e.offsetTop; e = e.offsetParent; }
+    } else {
+      ly = h / 2;
+    }
     const lx = side === 'right' ? w : 0;
     const a = n.r * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
     const dx = (lx - w / 2) * n.s, dy = (ly - h / 2) * n.s;
@@ -163,6 +172,21 @@ const Canvas = (() => {
     if (n.ports) n.ports.remove();
     nodes = nodes.filter(m => m !== n);
     delete byId[el.id];
+    draw();
+  }
+
+  // rebuild a window's port layer (meta rows can be replaced after register)
+  function refreshPorts(el) {
+    const n = byId[el.id];
+    if (!n) return;
+    dots = dots.filter(d => {
+      if (d.id !== el.id) return true;
+      d.c.remove();
+      return false;
+    });
+    if (n.ports) n.ports.remove();
+    makePorts(n);
+    restack();
     draw();
   }
 
@@ -462,7 +486,7 @@ const Canvas = (() => {
   }
 
   return {
-    init, register, removeWindow, addLink, removeLinksTo, setFlow,
+    init, register, removeWindow, addLink, removeLinksTo, setFlow, refreshPorts,
     reveal, fitAll, zoomBy,
     fit: animate => { if (!touched) fitAll(animate); },
     home: animate => { touched = false; fitAll(animate); },
