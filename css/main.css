@@ -363,6 +363,8 @@ html, body, * { scrollbar-width: none; }
   line-height: var(--lh-well-short);
   letter-spacing: -0.003em;
   resize: none;
+  -webkit-user-select: text;   /* the one selectable element on the board */
+          user-select: text;
 }
 #query::placeholder { color: var(--fg-3); }
 .input-tools { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
@@ -397,8 +399,17 @@ html, body, * { scrollbar-width: none; }
   transform-origin: 50% 50%;
   cursor: grab;
   touch-action: none;
+  -webkit-user-select: none;
+          user-select: none;
   transition: box-shadow 240ms ease;
 }
+/* nothing on the board is selectable — the whole window is the drag handle;
+   the only exception is the INPUT textarea, re-enabled below */
+.stage, #index-overlay {
+  -webkit-user-select: none;
+          user-select: none;
+}
+img, video { -webkit-user-drag: none; }
 .canvas > .node.is-dragging {
   cursor: grabbing;
   box-shadow: var(--card-shadow-lift);

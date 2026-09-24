@@ -435,6 +435,7 @@ const Canvas = (() => {
     stage.addEventListener('pointermove', onPointerMove);
     stage.addEventListener('pointerup', onPointerUp);
     stage.addEventListener('pointercancel', onPointerUp);
+    stage.addEventListener('dragstart', e => e.preventDefault()); // no native image ghost-drags
 
     // wheel = zoom, anchored on the cursor; a mouse notch eases, trackpad
     // scroll / ctrl+pinch tracks directly

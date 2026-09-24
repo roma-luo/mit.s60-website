@@ -291,6 +291,7 @@ const UI = (() => {
       const img = document.createElement('img');
       img.src = url;
       img.alt = entry.title;
+      img.draggable = false;
       frame.appendChild(img);
     } else {
       const video = document.createElement('video');
@@ -298,6 +299,7 @@ const UI = (() => {
       video.controls = true;
       video.preload = 'metadata';
       video.playsInline = true;
+      video.draggable = false;
       frame.appendChild(video);
     }
     body.appendChild(frame);
@@ -421,6 +423,7 @@ const UI = (() => {
         const img = document.createElement('img');
         img.src = url;
         img.alt = e.title;
+        img.draggable = false;
         body.appendChild(img);
       });
 
@@ -522,8 +525,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('send-btn').addEventListener('click', send);
 
-  // global keys: Esc closes overlays & stops speech; "/" focuses the input
+  // global keys: Esc closes overlays & stops speech; "/" focuses the input;
+  // Ctrl/Cmd+A is swallowed outside the textarea so nothing gets selected
   window.addEventListener('keydown', ev => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'a' &&
+        !/^(TEXTAREA|INPUT)$/.test(ev.target.tagName)) {
+      ev.preventDefault();
+      return;
+    }
     if (ev.key === 'Escape') {
       UI.hideIndex();
       Agent.cancel();
