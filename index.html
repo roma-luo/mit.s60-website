@@ -52,7 +52,7 @@
   </script>
   <script src="js/boot.js"></script>
 
-  <div class="stage" id="stage" aria-label="Board: scroll to zoom, drag empty space to pan">
+  <div class="stage" id="stage" aria-label="Board: scroll to zoom, drag a window to move it">
     <div class="canvas" id="canvas">
 
       <section class="node node--short" id="node-input" data-kind="text" data-label="s60-in" data-x="60" data-y="90">
@@ -109,12 +109,6 @@
 
     </div>
   </div>
-
-  <nav class="zoombar" aria-label="Zoom">
-    <button class="btn btn--icon" type="button" data-zoom="out" aria-label="Zoom out">&minus;</button>
-    <button class="btn" type="button" data-zoom="fit" aria-label="Fit all windows"><span class="zoombar__pct" id="pct">100%</span></button>
-    <button class="btn btn--icon" type="button" data-zoom="in" aria-label="Zoom in">+</button>
-  </nav>
 
   <div id="index-overlay" class="hidden">
     <p id="index-title">index</p>

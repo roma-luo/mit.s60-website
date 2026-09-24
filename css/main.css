@@ -376,10 +376,8 @@ html, body, * { scrollbar-width: none; }
   inset: 0;
   overflow: hidden;
   touch-action: none;
-  cursor: grab;
   background: var(--bg);
 }
-.stage.is-panning { cursor: grabbing; }
 .canvas {
   position: absolute;
   left: 0;
@@ -448,29 +446,6 @@ img, video { -webkit-user-drag: none; }
   rgba(255,255,255,0.16) 90%,
   rgba(255,255,255,0.38) 100%); }
 
-/* zoom controls — same pill material as the expand button */
-.zoombar {
-  position: fixed;
-  right: 16px;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  z-index: 10;
-  display: flex;
-  gap: 6px;
-}
-.btn--icon {
-  width: calc(var(--btn-h) + 4px);
-  padding: 0;
-  justify-content: center;
-  font-size: 14px;
-  letter-spacing: 0;
-}
-.zoombar__pct {
-  display: inline-block;
-  min-width: 38px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
 /* ============================ index overlay ============================ */
 #index-overlay {
   position: fixed;
@@ -502,7 +477,7 @@ img, video { -webkit-user-drag: none; }
 #index-dot {
   position: fixed;
   right: 18px;
-  bottom: 60px;   /* clear of the zoom bar */
+  bottom: 18px;
   width: 8px;
   height: 8px;
   border-radius: 50%;

@@ -1,8 +1,8 @@
 /* Canvas — the node-board engine (ported from reference/slop-instance.html).
  *
  * A fixed full-viewport stage; every window is a free body on the board.
- * Windows drag with a viscous feel, the board pans by dragging empty space
- * and zooms with the wheel anchored at the cursor. Ports on the meta rows
+ * Windows drag with a viscous feel, the wheel zooms the board anchored at
+ * the cursor, and fit-all frames everything (empty space does not pan). Ports on the meta rows
  * wire windows together; wires follow translate/rotate/scale every frame.
  *
  * Public API (kept compatible with the previous canvas driver):
@@ -258,7 +258,7 @@ const Canvas = (() => {
 
   function fitAll(animate) {
     const r = stage.getBoundingClientRect();
-    const pad = 40, bar = 64;
+    const pad = 40;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     nodes.forEach(n => {
       x0 = Math.min(x0, n.tx); y0 = Math.min(y0, n.ty);
@@ -266,10 +266,10 @@ const Canvas = (() => {
     });
     if (x0 === Infinity) return;
     const s = clamp(Math.min((r.width - 2 * pad) / (x1 - x0),
-                             (r.height - 2 * pad - bar) / (y1 - y0)), ZMIN, 1);
+                             (r.height - 2 * pad) / (y1 - y0)), ZMIN, 1);
     view.ts = s;
     view.tx = (r.width - (x1 - x0) * s) / 2 - x0 * s;
-    view.ty = (r.height - bar - (y1 - y0) * s) / 2 - y0 * s;
+    view.ty = (r.height - (y1 - y0) * s) / 2 - y0 * s;
     if (animate) kick(); else snapView();
   }
 
@@ -296,7 +296,7 @@ const Canvas = (() => {
   /* ==================== pointers: drag / pan / pinch ==================== */
   let touched = false;
   const pts = new Map();
-  let drag = null, panning = null, pinch = null;
+  let drag = null, pinch = null;
 
   function endWindowDrag() {
     if (!drag) return;
@@ -307,8 +307,6 @@ const Canvas = (() => {
   }
   function startPinch() {
     endWindowDrag();
-    panning = null;
-    stage.classList.remove('is-panning');
     const [a, b] = [...pts.values()];
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: view.s, c0: toCanvas(mid.x, mid.y) };
@@ -323,6 +321,7 @@ const Canvas = (() => {
     if (pts.size === 2) { startPinch(); return; }
     if (pts.size > 2) return;
 
+    // windows drag; empty space does NOT pan (wheel-only zoom + fit-all)
     const el = e.target.closest('.node');
     if (el && byId[el.id]) {
       const n = byId[el.id], p = toCanvas(e.clientX, e.clientY);
@@ -334,9 +333,6 @@ const Canvas = (() => {
       el.classList.add('is-dragging');
       n.ts = LIFT;
       kick();
-    } else {
-      panning = { id: e.pointerId, x: e.clientX, y: e.clientY };
-      stage.classList.add('is-panning');
     }
   }
 
@@ -353,12 +349,6 @@ const Canvas = (() => {
       view.tx = mid.x - r.left - pinch.c0.x * s;
       view.ty = mid.y - r.top - pinch.c0.y * s;
       snapView();
-      return;
-    }
-    if (panning && e.pointerId === panning.id) {
-      panView(e.clientX - panning.x, e.clientY - panning.y);
-      panning.x = e.clientX;
-      panning.y = e.clientY;
       return;
     }
     if (drag && e.pointerId === drag.id) {
@@ -378,10 +368,6 @@ const Canvas = (() => {
     pts.delete(e.pointerId);
     if (pinch && pts.size < 2) pinch = null;
     if (drag && e.pointerId === drag.id) endWindowDrag();
-    if (panning && e.pointerId === panning.id) {
-      panning = null;
-      stage.classList.remove('is-panning');
-    }
   };
 
   /* ============================ the loop ============================ */
@@ -458,16 +444,7 @@ const Canvas = (() => {
     });
     stage.addEventListener('gestureend', e => { e.preventDefault(); g0 = null; });
 
-    const zoombar = document.querySelector('.zoombar');
-    if (zoombar) zoombar.addEventListener('click', e => {
-      const b = e.target.closest('[data-zoom]');
-      if (!b) return;
-      touched = true;
-      const k = b.dataset.zoom;
-      if (k === 'in') zoomBy(ZSTEP);
-      if (k === 'out') zoomBy(1 / ZSTEP);
-      if (k === 'fit') { touched = false; fitAll(true); }
-    });
+    // Cmd/Ctrl +/-/0: zoom steps and fit-all (wheel zooms, no pan)
     addEventListener('keydown', e => {
       if (!(e.ctrlKey || e.metaKey)) return;
       if (e.key === '=' || e.key === '+') { e.preventDefault(); touched = true; zoomBy(ZSTEP); }
