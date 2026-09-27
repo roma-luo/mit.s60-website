@@ -22,6 +22,17 @@ BM25-only). For a relay/aggregator OpenAI key, also set `OPENAI_BASE_URL`
 (`python -m http.server`) still works but has no `/api`, so the brain falls
 back to static.
 
+## Deploy
+
+- **GitHub Pages** (static): push to the Pages branch. `.nojekyll` is required
+  — without it Jekyll renders the front-matter `.md` files under `content/`
+  into HTML and every memory card 404s. Pages has no `/api`, so on
+  `*.github.io` the site runs the static brain (keyword search over the
+  manifest); `?brain=live` forces the API attempt anyway.
+- **Vercel** (live brain): `/api/chat` + `/api/recall` run as serverless
+  functions; set `DEEPSEEK_API_KEY` (and optionally `OPENAI_API_KEY`) in the
+  project settings.
+
 ## Use it
 
 - The screen is a board of draggable windows: **s60-in** (input), **s60-self**
