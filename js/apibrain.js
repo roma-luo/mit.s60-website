@@ -6,19 +6,20 @@
  *   await ApiBrain.answer(query) → { text, docIds: string[] }
  */
 const ApiBrain = (() => {
-  // enabled: anything except ?brain=static. No param → production hostnames
-  // default live, localhost stays static (the existing B13 logic).
-  const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  // enabled wherever /api exists (Vercel, localhost via scripts/dev-server.mjs).
+  // GitHub Pages is static-only, so it starts on the static brain instead of
+  // spending the first question on a failed POST; ?brain=live overrides that,
+  // ?brain=static forces the static, no-network brain anywhere.
   const brainParam = (location.search.match(/(?:\?|&)brain=([\w-]*)/) || [])[1] || null;
-  const enabled = brainParam === 'static' ? false
-                : brainParam ? true
-                : !isLocal;
+  const staticHost = /\.github\.io$/i.test(location.hostname);
+  const enabled = brainParam === 'static' ? false : brainParam ? true : !staticHost;
 
   // a 404/405 from the proxy means this host has no backend at all (e.g.
   // GitHub Pages) — after one such failure, disable for the rest of the
   // session instead of eating a 404 round-trip per question
   let disabled = false;
 
+  // → the assistant message: { content, tool_calls? }
   async function chat(messages) {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -27,10 +28,12 @@ const ApiBrain = (() => {
     });
     if (!res.ok) throw new Error('proxy http ' + res.status);
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    const text = ((data.choices && data.choices[0] && data.choices[0].message.content) || '').trim();
-    if (!text) throw new Error('empty deepseek response');
-    return text;
+    if (data.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+    const msg = data.choices && data.choices[0] && data.choices[0].message;
+    if (!msg || (!(msg.content || '').trim() && !(msg.tool_calls || []).length)) {
+      throw new Error('empty deepseek response');
+    }
+    return msg;
   }
 
   async function answer(q) {

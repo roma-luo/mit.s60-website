@@ -51,7 +51,10 @@ const Agent = (() => {
 
     const liveBrain = ApiBrain.enabled ? ApiBrain : null;
     if (liveBrain) {
-      try { res = await liveBrain.answer(query); }
+      try {
+        res = await liveBrain.answer(query);
+        UI.setMode('live');   // recovers the Mode row after an earlier fallback
+      }
       catch (err) {
         console.warn('live brain failed, falling back to static brain:', err);
         UI.setMode('static'); // reflect the fallback in the INPUT meta Mode row

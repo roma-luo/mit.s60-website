@@ -294,6 +294,11 @@ html, body, * { scrollbar-width: none; }
   pointer-events: none;
 }
 .portrait canvas { position: relative; }
+/* attachment windows: the frame takes the media's own aspect ratio (set
+   from its natural size once known) so a landscape diagram or a screen
+   recording shows whole instead of a centre strip of a portrait crop */
+.portrait.media { aspect-ratio: var(--media-ar, 16 / 9); background: #000; }
+.portrait.media video { pointer-events: auto; object-fit: contain; }
 .portrait .face-video { opacity: 0; transition: opacity .35s ease; }
 .portrait .face-video.front { opacity: 1; }
 /* the recess has to sit ABOVE the photo, or the image paints over it */
@@ -329,6 +334,8 @@ html, body, * { scrollbar-width: none; }
   overflow: hidden;
 }
 .well__text p + p { margin-top: calc(var(--fs-well) * var(--lh-well) * 0.6); }
+/* the answer is plain text: keep the model's line and paragraph breaks */
+.well__text p.answer { white-space: pre-line; }
 .well__text .placeholder { color: var(--fg-3); }
 /* the clipped text runs out under a fade at the bottom of the well */
 .well::after {
@@ -348,6 +355,12 @@ html, body, * { scrollbar-width: none; }
 
 /* short text: no well, the content sits on the face */
 .node--short .node__body { padding: 14px 10px 8px; }
+.short__text {
+  color: var(--fg);
+  font-size: var(--fs-well-short);
+  line-height: var(--lh-well-short);
+  letter-spacing: -0.003em;
+}
 
 /* ============================ INPUT window ============================ */
 #query {

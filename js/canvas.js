@@ -314,7 +314,7 @@ const Canvas = (() => {
 
   function onPointerDown(e) {
     if (e.button !== undefined && e.button !== 0) return;
-    if (e.target.closest('.btn, textarea, .node__close')) return; // buttons / text are not drag handles
+    if (e.target.closest('.btn, textarea, .node__close, video')) return; // buttons / text / video controls are not drag handles
     touched = true;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { stage.setPointerCapture(e.pointerId); } catch (_) {}

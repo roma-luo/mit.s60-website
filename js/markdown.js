@@ -11,11 +11,16 @@ const Markdown = (() => {
   const escapeHtml = s => s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 
+  // text is already html-escaped when it gets here; only http(s)/relative
+  // URLs survive (no javascript:/data: hrefs from a document)
   function resolveUrl(src, baseUrl) {
+    const raw = src.replace(/&amp;/g, '&');
+    if (/^\s*[a-z][a-z0-9+.-]*:/i.test(raw) && !/^\s*https?:/i.test(raw)) return '#';
     if (!baseUrl) return src;
-    try { return new URL(src, baseUrl).href; } catch (e) { return src; }
+    try { return new URL(raw, baseUrl).href.replace(/"/g, '%22'); } catch (e) { return src; }
   }
 
   function inline(t, baseUrl) {
@@ -52,7 +57,9 @@ const Markdown = (() => {
     };
     const flushQuote = () => {
       if (quote.length) {
-        out.push('<blockquote>' + quote.map(l => '<p>' + inline(l, baseUrl) + '</p>').join('') + '</blockquote>');
+        // consecutive > lines are one paragraph; a bare ">" line separates paragraphs
+        const paras = quote.join('\n').split(/\n\s*\n/).map(p => p.replace(/\n/g, ' ').trim()).filter(Boolean);
+        out.push('<blockquote>' + paras.map(p => '<p>' + inline(p, baseUrl) + '</p>').join('') + '</blockquote>');
         quote = [];
       }
     };

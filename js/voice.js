@@ -15,17 +15,20 @@ const Voice = (() => {
   let watchdogTimer = null;
   let generation = 0;   // bumped by stop()/done(): invalidates stale callbacks
   let voiceCache = [];
+  // no TTS at all (some in-app webviews): speak() degrades to a timed
+  // silent read, so the typewriter reveal and the round still complete
+  const synth = window.speechSynthesis || null;
 
   function cacheVoices() {
-    const v = window.speechSynthesis.getVoices();
+    const v = synth ? synth.getVoices() : [];
     if (v && v.length) voiceCache = v;
   }
   // B8: Chrome loads voices asynchronously — cache them as soon as they arrive
   cacheVoices();
-  if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = cacheVoices;
+  if (synth) synth.onvoiceschanged = cacheVoices;
 
   function pickVoice() {
-    const voices = voiceCache.length ? voiceCache : window.speechSynthesis.getVoices();
+    const voices = voiceCache.length ? voiceCache : (synth ? synth.getVoices() : []);
     // B6: word boundaries + exclude /female/ — "Female" contains "male"
     return voices.find(v => /^en/i.test(v.lang) && /\b(male|david|daniel|alex|fred)\b/i.test(v.name) && !/female/i.test(v.name))
         || voices.find(v => /^en/i.test(v.lang))
@@ -57,6 +60,10 @@ const Voice = (() => {
   function speak(text, { onViseme, onBoundary, onEnd } = {}) {
     stop();
     const gen = ++generation;
+    if (!synth) {
+      watchdogTimer = setTimeout(() => { if (gen === generation && onEnd) onEnd(); }, text.length * 60);
+      return;
+    }
     const chunks = chunkText(text);
     const voice = pickVoice();
     let idx = 0;
@@ -74,7 +81,7 @@ const Voice = (() => {
       if (!isCurrent()) return;
       generation++; // invalidate any queued chunk callbacks
       speaking = false;
-      window.speechSynthesis.cancel();
+      synth.cancel();
       if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
       if (watchdogTimer) { clearTimeout(watchdogTimer); watchdogTimer = null; }
       if (onViseme) onViseme(0);
@@ -115,14 +122,14 @@ const Voice = (() => {
         speakNext();
       };
       u.onerror = () => { if (isCurrent()) done(); };
-      window.speechSynthesis.speak(u);
+      synth.speak(u);
     };
     speakNext();
   }
 
   function stop() {
     generation++;
-    window.speechSynthesis.cancel();
+    if (synth) synth.cancel();
     speaking = false;
     if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
     if (watchdogTimer) { clearTimeout(watchdogTimer); watchdogTimer = null; }

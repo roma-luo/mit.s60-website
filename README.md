@@ -6,20 +6,21 @@ every week of course work. Static front end (no build step, no dependencies)
 
 ## Run locally
 
-The site fetches `content/manifest.json`, so it must be served over HTTP
-(opening `index.html` via `file://` will not work):
-
 ```bash
 cd s60-webpage
-python -m http.server 8000
-# open http://localhost:8000  (static brain)
+npm run dev          # = node scripts/dev-server.mjs, zero dependencies
+# open http://localhost:8000  (live brain: DeepSeek)
 ```
 
-For the live brain locally, use `vercel dev` so the API routes work, and
-fill `.env` (see `.env.example`) with `DEEPSEEK_API_KEY` (generation, via
-`/api/chat`) and `OPENAI_API_KEY` (embeddings, via `/api/recall`; optional —
-without it recall runs BM25-only). For a relay/aggregator OpenAI key, also
-set `OPENAI_BASE_URL` (and optionally `OPENAI_EMBED_MODEL`).
+`scripts/dev-server.mjs` serves the static site and mounts `api/chat.js` /
+`api/recall.js` directly, so localhost runs the same live brain as
+production without `vercel dev`. Fill `.env` (see `.env.example`) with
+`DEEPSEEK_API_KEY` (generation, via `/api/chat`) and optionally
+`OPENAI_API_KEY` (embeddings, via `/api/recall`; without it recall runs
+BM25-only). For a relay/aggregator OpenAI key, also set `OPENAI_BASE_URL`
+(and optionally `OPENAI_EMBED_MODEL`). A plain static server
+(`python -m http.server`) still works but has no `/api`, so the brain falls
+back to static.
 
 ## Use it
 
@@ -43,21 +44,23 @@ set `OPENAI_BASE_URL` (and optionally `OPENAI_EMBED_MODEL`).
   click a card to load it into s60-out + a child window (no speech).
   `Esc` stops speech and folds expanded wells back.
 - Mic button = speech input (Chrome only).
-- Online (the Vercel deployment) the default brain is **live** (cloud API);
-  locally it stays the static brain. `?brain=static` forces the static,
+- The default brain is **live** (cloud API) both online and locally
+  (`npm run dev`). `?brain=static` forces the static,
   no-network mode anywhere. If the live brain fails it silently falls back
   to static (and disables itself for the session on hosts with no backend).
 
 ## Live brain mode (cloud API agent loop)
 
-Open the site on the Vercel deployment (or `vercel dev` locally). This is a
+Open the site on the Vercel deployment (or `npm run dev` locally). This is a
 hand-written agent loop (no frameworks):
 
 - the **harness** (system prompt) carries only the persona — name, affiliation,
-  style — plus the tool protocol. No course content is stuffed into context.
+  style. No course content is stuffed into context.
 - the agent acts in a loop: it calls `recall(query)` to search its long-term
-  memory and `show(id)` / `show(ids:[..])` to pull documents out for the
-  visitor, then answers in plain text when it has enough. Max 4 steps.
+  memory and `show(ids)` to pull documents out for the visitor, then answers
+  in plain text when it has enough. Max 5 steps. Tools use DeepSeek's native
+  function calling; the tool schema is fixed server-side in `api/chat.js`, so
+  tool syntax never lands in the visible answer.
 - **retrieval** is server-side: `POST /api/recall` fuses BM25 (always) with
   vector cosine (OpenAI `text-embedding-3-small`, when `OPENAI_API_KEY` is
   set) via Reciprocal Rank Fusion over a build-time chunk index; generation

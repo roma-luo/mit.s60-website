@@ -259,6 +259,50 @@ const UI = (() => {
     return card;
   }
 
+  // proposals are short text: no well, no expand — the one-paragraph answer
+  // sits on the face (the INPUT window's design), wired straight to its image
+  const SHORT_SECTIONS = new Set(['final project']);
+  const isShort = entry => SHORT_SECTIONS.has(entry.section);
+
+  function buildShortChild(entry) {
+    const card = document.createElement('section');
+    card.className = 'node node--short child';
+    card.id = 'c-' + entry.id;
+    card.dataset.id = entry.id;
+
+    const head = document.createElement('header');
+    head.className = 'node__head';
+    const label = document.createElement('span');
+    label.className = 'node__label';
+    label.textContent = LABELS.child(entry);
+    const close = document.createElement('button');
+    close.className = 'node__close';
+    close.setAttribute('aria-label', 'dismiss');
+    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(card); });
+    head.appendChild(label);
+    head.appendChild(close);
+
+    const body = document.createElement('div');
+    body.className = 'node__body';
+    const p = document.createElement('p');
+    p.className = 'short__text';
+    p.textContent = entry.answer;
+    body.appendChild(p);
+
+    const meta = document.createElement('footer');
+    meta.className = 'node__meta';
+    const rows = document.createElement('div');
+    rows.className = 'meta-rows';
+    rows.appendChild(metaRow('Artifact', entry.title));
+    rows.appendChild(metaRow('Type', 'text / proposal'));
+    meta.appendChild(rows);
+
+    card.appendChild(head);
+    card.appendChild(body);
+    card.appendChild(meta);
+    return card;
+  }
+
   // one small media window per attachment, spawned right after its parent doc
   function buildAttachmentChild(entry, att) {
     const ext = ((att.match(/\.([a-z0-9]+)$/i) || [])[1] || '').toLowerCase();
@@ -286,20 +330,31 @@ const UI = (() => {
     const body = document.createElement('div');
     body.className = 'node__body';
     const frame = document.createElement('div');
-    frame.className = 'portrait';
+    frame.className = 'portrait media';
+    // the frame follows the media's natural aspect; mediaReady lets the
+    // spawn layout wait for real heights (resolves on error too)
+    const fitAspect = (w, h) => { if (w && h) frame.style.setProperty('--media-ar', w + ' / ' + h); };
     if (isImage) {
       const img = document.createElement('img');
-      img.src = url;
       img.alt = entry.title;
       img.draggable = false;
+      card.mediaReady = new Promise(resolve => {
+        img.onload = () => { fitAspect(img.naturalWidth, img.naturalHeight); resolve(); };
+        img.onerror = resolve;
+      });
+      img.src = url;
       frame.appendChild(img);
     } else {
       const video = document.createElement('video');
-      video.src = url;
       video.controls = true;
       video.preload = 'metadata';
       video.playsInline = true;
       video.draggable = false;
+      card.mediaReady = new Promise(resolve => {
+        video.onloadedmetadata = () => { fitAspect(video.videoWidth, video.videoHeight); resolve(); };
+        video.onerror = resolve;
+      });
+      video.src = url;
       frame.appendChild(video);
     }
     body.appendChild(frame);
@@ -322,6 +377,15 @@ const UI = (() => {
     if (typeof Canvas !== 'undefined') {
       Canvas.removeLinksTo(card.id);
       Canvas.removeWindow(card);
+      // keep the chain whole: whatever hung off this card re-wires to its parent
+      const parent = $(card.dataset.parent || '');
+      if (!card.classList.contains('leaving') && parent) {
+        document.querySelectorAll('.child').forEach(c => {
+          if (c.dataset.parent !== card.id || c.classList.contains('leaving')) return;
+          c.dataset.parent = parent.id;
+          Canvas.addLink(parent.id, c.id);
+        });
+      }
     }
     expanders.delete(card);
     card.remove();
@@ -329,8 +393,31 @@ const UI = (() => {
 
   const delay = ms => new Promise(r => setTimeout(r, ms));
 
+  // §spawn layout: one chain, never a fan. Cards run left → right in
+  // reading order — OUTPUT → doc → its attachments → next doc → … — and each
+  // card is wired only from the one before it, so every window has exactly
+  // one wire in and one wire out (a proposal leads straight into its image).
+  // The chain is loose on purpose: each round draws fresh gaps and heights
+  // (mostly alternating above/below OUTPUT's midline, sometimes not), so it
+  // reads as cards set down by hand rather than a grid. One card per column,
+  // so no window ever sits in another's wire path.
+  const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+
+  function layoutChain(cards, out) {
+    const midY = +out.dataset.y + out.offsetHeight / 2;
+    let x = +out.dataset.x + out.offsetWidth;   // right edge of the previous card
+    let dir = Math.random() < 0.5 ? -1 : 1;
+    return cards.map(card => {
+      if (Math.random() < 0.7) dir = -dir;
+      const cx = x + rnd(45, 170);
+      const cy = midY + dir * rnd(40, 300) - card.offsetHeight * rnd(0.25, 0.75);
+      x = cx + card.offsetWidth;
+      return { card, x: cx, y: cy };
+    });
+  }
+
   // §spawn: previous round's windows fade out and leave; then the new cards
-  // appear one by one (~220ms apart) to the right of OUTPUT, each wired in.
+  // appear one by one (~220ms apart) along the chain, each wired in.
   // Spawned windows join the board: if the user has not taken over the view,
   // fit-all re-frames; otherwise the camera stays where it is.
   async function spawnChildren(entries, round) {
@@ -338,7 +425,9 @@ const UI = (() => {
     spawnRound = round;
     const alive = () => myGen === spawnGen && (round === undefined || round === spawnRound);
 
-    const old = [...expanders.keys()].filter(card => card.parentNode);
+    // every child on the board — attachment windows have no expander, so
+    // collecting from `expanders` alone left them (and their wires) behind
+    const old = [...document.querySelectorAll('#canvas > .child')];
     if (old.length) {
       for (const card of old) card.classList.add('leaving');
       await delay(120);
@@ -347,31 +436,44 @@ const UI = (() => {
     if (!alive()) return;
 
     const out = $('node-output');
-    let colY = +out.dataset.y;
-    const colX = +out.dataset.x + 380;
-    let last = null;
-    const spawnOne = card => {
+    const all = entries.flatMap(entry => [
+      isShort(entry) ? buildShortChild(entry) : buildChild(entry),
+      ...(entry.attachments || []).map(att => buildAttachmentChild(entry, att))
+    ]);
+    all.forEach((card, i) => { card.dataset.parent = i ? all[i - 1].id : 'node-output'; });
+
+    // mount every card invisibly first: the layout needs real heights
+    for (const card of all) {
       card.classList.add('entering');
-      card.dataset.x = colX;
-      card.dataset.y = colY;
       $('canvas').appendChild(card);
+    }
+    // attachment frames size themselves from their media: wait (briefly) so
+    // the layout sees final heights and cards can't grow into each other
+    const media = all.map(c => c.mediaReady).filter(Boolean);
+    if (media.length) await Promise.race([Promise.all(media), delay(2500)]);
+    if (!alive()) { all.forEach(c => { expanders.delete(c); c.remove(); }); return; }
+    const order = layoutChain(all, out);
+
+    let last = null;
+    const spawnOne = ({ card, x, y }) => {
+      card.dataset.x = x;
+      card.dataset.y = y;
       Canvas.register(card, card.classList.contains('node--image') ? 'image' : 'text');
-      Canvas.addLink('node-output', card.id);
-      colY += card.offsetHeight + 24;   // next card goes below this one
+      Canvas.addLink(card.dataset.parent, card.id);
       requestAnimationFrame(() => card.classList.remove('entering'));
       if (typeof Canvas !== 'undefined') Canvas.fit(true); // re-frames only until first touch
       last = card;
     };
-    for (const entry of entries) {
-      const cards = [buildChild(entry)];
-      for (const att of entry.attachments || []) cards.push(buildAttachmentChild(entry, att));
-      for (const card of cards) {
-        if (!alive()) break;
-        if (last) await delay(220);
-        if (!alive()) break;
-        spawnOne(card);
-      }
+    // spawn in chain order: a card's parent is always already on the board
+    for (const p of order) {
       if (!alive()) break;
+      if (last) await delay(220);
+      if (!alive()) break;
+      spawnOne(p);
+    }
+    // a cancelled round leaves unregistered, invisible cards behind: drop them
+    for (const card of all) {
+      if (!card.dataset.kind) { expanders.delete(card); card.remove(); }
     }
     if (last && alive() && typeof Canvas !== 'undefined') Canvas.reveal(last);
   }

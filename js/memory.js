@@ -45,7 +45,9 @@ const Memory = (() => {
     if (!docCache[entry.id]) {
       const res = await fetch(entry.file);
       if (!res.ok) throw new Error('doc fetch failed: ' + entry.file);
-      docCache[entry.id] = await res.text();
+      // front matter is build-time metadata (already in the manifest): strip
+      // it, or excerpts and the expanded document open with "id: … label: …"
+      docCache[entry.id] = (await res.text()).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
     }
     return docCache[entry.id];
   }
@@ -83,7 +85,7 @@ const Memory = (() => {
     q = q.toLowerCase();
     const words = q.match(/[a-z0-9']+/g) || [];
     const bigrams = [];
-    for (const run of q.match(/[　-鿿豈-﫿]+/g) || []) {
+    for (const run of q.match(/[一-鿿豈-﫿]+/g) || []) {   // same CJK range as lib/tokens.js (no punctuation bigrams)
       if (run.length === 1) bigrams.push(run);
       for (let i = 0; i < run.length - 1; i++) bigrams.push(run.slice(i, i + 2));
     }
