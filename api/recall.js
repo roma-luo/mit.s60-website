@@ -7,6 +7,7 @@
 import { loadIndex } from '../lib/index.js';
 import { embedQuery } from '../lib/embed.js';
 import { search } from '../lib/search.js';
+import { cors } from '../lib/cors.js';
 
 const RATE = 30;
 const WINDOW_MS = 60000;
@@ -22,6 +23,7 @@ function limited(ip) {
 }
 
 export default async function handler(req, res) {
+  if (cors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ hits: [] });
   try {
     const ip = String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'anon')

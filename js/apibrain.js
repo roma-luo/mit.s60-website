@@ -6,13 +6,14 @@
  *   await ApiBrain.answer(query) → { text, docIds: string[] }
  */
 const ApiBrain = (() => {
-  // enabled wherever /api exists (Vercel, localhost via scripts/dev-server.mjs).
-  // GitHub Pages is static-only, so it starts on the static brain instead of
-  // spending the first question on a failed POST; ?brain=live overrides that,
-  // ?brain=static forces the static, no-network brain anywhere.
+  // where /api lives: same origin on Vercel and localhost (dev-server.mjs);
+  // GitHub Pages is static-only, so there the page calls the Vercel backend
+  // cross-origin (lib/cors.js allow-lists the Pages origin). ?brain=static
+  // forces the static, no-network brain anywhere.
+  const BACKEND = 'https://mit.s60.romaluo.xyz';
+  const base = /\.github\.io$/i.test(location.hostname) ? BACKEND : '';
   const brainParam = (location.search.match(/(?:\?|&)brain=([\w-]*)/) || [])[1] || null;
-  const staticHost = /\.github\.io$/i.test(location.hostname);
-  const enabled = brainParam === 'static' ? false : brainParam ? true : !staticHost;
+  const enabled = brainParam !== 'static';
 
   // a 404/405 from the proxy means this host has no backend at all (e.g.
   // GitHub Pages) — after one such failure, disable for the rest of the
@@ -21,7 +22,7 @@ const ApiBrain = (() => {
 
   // → the assistant message: { content, tool_calls? }
   async function chat(messages) {
-    const res = await fetch('/api/chat', {
+    const res = await fetch(base + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages })
@@ -45,5 +46,5 @@ const ApiBrain = (() => {
     }
   }
 
-  return { enabled, answer };
+  return { enabled, answer, base };
 })();

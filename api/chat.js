@@ -11,6 +11,8 @@
  * Naive per-IP rate limit + payload caps keep a leaked URL from burning
  * the key.
  */
+import { cors } from '../lib/cors.js';
+
 const TOOLS = [
   {
     type: 'function',
@@ -55,6 +57,7 @@ function limited(ip) {
 }
 
 export default async function handler(req, res) {
+  if (cors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
   }

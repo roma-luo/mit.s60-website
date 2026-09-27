@@ -36,7 +36,7 @@ const AgentLoop = (() => {
 
   async function runRecall(q) {
     try {
-      const r = await fetch('/api/recall', {
+      const r = await fetch(ApiBrain.base + '/api/recall', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, k: 6 })

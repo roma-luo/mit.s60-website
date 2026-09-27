@@ -24,11 +24,12 @@ back to static.
 
 ## Deploy
 
-- **GitHub Pages** (static): push to the Pages branch. `.nojekyll` is required
-  — without it Jekyll renders the front-matter `.md` files under `content/`
-  into HTML and every memory card 404s. Pages has no `/api`, so on
-  `*.github.io` the site runs the static brain (keyword search over the
-  manifest); `?brain=live` forces the API attempt anyway.
+- **GitHub Pages** (front end): the course repo's `pages.yml` publishes
+  `website/`. `.nojekyll` is required — without it Jekyll renders the
+  front-matter `.md` files under `content/` into HTML and every memory card
+  404s. Pages has no `/api`, so on `*.github.io` the page calls the Vercel
+  backend cross-origin (`BACKEND` in `js/apibrain.js`); `lib/cors.js`
+  allow-lists the Pages origin.
 - **Vercel** (live brain): `/api/chat` + `/api/recall` run as serverless
   functions; set `DEEPSEEK_API_KEY` (and optionally `OPENAI_API_KEY`) in the
   project settings.
