@@ -137,14 +137,18 @@ const Canvas = (() => {
     });
   }
 
-  function register(el, kind) {
+  // opts.enter: the window glides in — it starts a little low and small and
+  // eases to its place through the same viscous follow as a drag
+  function register(el, kind, opts = {}) {
     if (byId[el.id]) return byId[el.id];
     el.dataset.kind = kind;
+    const tx = +el.dataset.x || 0, ty = +el.dataset.y || 0;
+    const enter = opts.enter && !calm;
     const n = {
       el,
-      x: +el.dataset.x || 0, y: +el.dataset.y || 0,
-      tx: +el.dataset.x || 0, ty: +el.dataset.y || 0,
-      r: 0, s: 1, ts: 1, lever: 0, z: ++z
+      x: tx, y: enter ? ty + 26 : ty,
+      tx, ty,
+      r: 0, s: enter ? 0.94 : 1, ts: 1, lever: 0, z: ++z
     };
     nodes.push(n);
     byId[el.id] = n;
@@ -152,6 +156,7 @@ const Canvas = (() => {
     restack();
     apply(n);
     draw();
+    if (enter) kick();
     return n;
   }
 
@@ -256,13 +261,14 @@ const Canvas = (() => {
     applyView();
   }
 
-  function fitAll(animate) {
+  // frame a set of boxes {x, y, w, h} (canvas px) in the viewport
+  function frameRects(rects, animate) {
     const r = stage.getBoundingClientRect();
     const pad = 40;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    nodes.forEach(n => {
-      x0 = Math.min(x0, n.tx); y0 = Math.min(y0, n.ty);
-      x1 = Math.max(x1, n.tx + n.el.offsetWidth); y1 = Math.max(y1, n.ty + n.el.offsetHeight);
+    rects.forEach(b => {
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
+      x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h);
     });
     if (x0 === Infinity) return;
     const s = clamp(Math.min((r.width - 2 * pad) / (x1 - x0),
@@ -271,6 +277,13 @@ const Canvas = (() => {
     view.tx = (r.width - (x1 - x0) * s) / 2 - x0 * s;
     view.ty = (r.height - (y1 - y0) * s) / 2 - y0 * s;
     if (animate) kick(); else snapView();
+  }
+  const fitAll = animate => frameRects(nodes.map(n => box(n.el.id)), animate);
+
+  // a window's live target box in canvas px (where it is, or is gliding to)
+  function box(id) {
+    const n = byId[id];
+    return n ? { x: n.tx, y: n.ty, w: n.el.offsetWidth, h: n.el.offsetHeight } : null;
   }
 
   // glide the view so the window's final footprint is inside the viewport
@@ -465,7 +478,8 @@ const Canvas = (() => {
 
   return {
     init, register, removeWindow, addLink, removeLinksTo, setFlow, refreshPorts,
-    reveal, fitAll, zoomBy,
+    reveal, fitAll, zoomBy, frameRects, box,
+    get touched() { return touched; },
     fit: animate => { if (!touched) fitAll(animate); },
     home: animate => { touched = false; fitAll(animate); },
     reflow: ms => { reflowUntil = performance.now() + ms; kick(); },

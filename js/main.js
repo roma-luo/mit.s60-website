@@ -403,23 +403,39 @@ const UI = (() => {
   // so no window ever sits in another's wire path.
   const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
 
-  function layoutChain(cards, out) {
-    const midY = +out.dataset.y + out.offsetHeight / 2;
-    let x = +out.dataset.x + out.offsetWidth;   // right edge of the previous card
+  // origin = OUTPUT's live box (it may have been dragged anywhere), and no
+  // card may land on a window already on the board (INPUT / SELF / OUTPUT,
+  // wherever the visitor left them) or on an earlier card of this chain
+  const GAP = 28;
+  const hits = (a, b) => a.x < b.x + b.w + GAP && b.x < a.x + a.w + GAP &&
+                         a.y < b.y + b.h + GAP && b.y < a.y + a.h + GAP;
+
+  function layoutChain(cards) {
+    const out = Canvas.box('node-output');
+    const taken = ['node-input', 'node-self', 'node-output'].map(Canvas.box).filter(Boolean);
+    const midY = out.y + out.h / 2;
+    let x = out.x + out.w;   // right edge of the previous card
     let dir = Math.random() < 0.5 ? -1 : 1;
     return cards.map(card => {
       if (Math.random() < 0.7) dir = -dir;
-      const cx = x + rnd(45, 170);
-      const cy = midY + dir * rnd(40, 300) - card.offsetHeight * rnd(0.25, 0.75);
-      x = cx + card.offsetWidth;
-      return { card, x: cx, y: cy };
+      const w = card.offsetWidth, h = card.offsetHeight;
+      const b = { x: x + rnd(45, 170), y: midY + dir * rnd(40, 300) - h * rnd(0.25, 0.75), w, h };
+      // nudge off anything it lands on: try growing offsets, both ways
+      const y0 = b.y;
+      for (let k = 1; k < 40 && taken.some(t => hits(b, t)); k++) {
+        b.y = y0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 60;
+      }
+      while (taken.some(t => hits(b, t))) b.x += 60;   // still blocked: step right
+      taken.push(b);
+      x = b.x + w;
+      return { card, x: b.x, y: b.y, w, h };
     });
   }
 
   // §spawn: previous round's windows fade out and leave; then the new cards
-  // appear one by one (~220ms apart) along the chain, each wired in.
-  // Spawned windows join the board: if the user has not taken over the view,
-  // fit-all re-frames; otherwise the camera stays where it is.
+  // appear one by one (~220ms apart) along the chain, each gliding in and
+  // wired to the one before. The camera glides first to OUTPUT + the whole
+  // chain, so no card ever arrives off-screen.
   async function spawnChildren(entries, round) {
     const myGen = ++spawnGen;
     spawnRound = round;
@@ -435,7 +451,6 @@ const UI = (() => {
     }
     if (!alive()) return;
 
-    const out = $('node-output');
     const all = entries.flatMap(entry => [
       isShort(entry) ? buildShortChild(entry) : buildChild(entry),
       ...(entry.attachments || []).map(att => buildAttachmentChild(entry, att))
@@ -452,16 +467,19 @@ const UI = (() => {
     const media = all.map(c => c.mediaReady).filter(Boolean);
     if (media.length) await Promise.race([Promise.all(media), delay(2500)]);
     if (!alive()) { all.forEach(c => { expanders.delete(c); c.remove(); }); return; }
-    const order = layoutChain(all, out);
+    const order = layoutChain(all);
+    // glide the camera before the cards arrive: the whole board while the
+    // visitor hasn't taken over the view, else OUTPUT + the new chain
+    const keep = Canvas.touched ? ['node-output'] : ['node-input', 'node-self', 'node-output'];
+    Canvas.frameRects([...keep.map(Canvas.box), ...order], true);
 
     let last = null;
     const spawnOne = ({ card, x, y }) => {
       card.dataset.x = x;
       card.dataset.y = y;
-      Canvas.register(card, card.classList.contains('node--image') ? 'image' : 'text');
+      Canvas.register(card, card.classList.contains('node--image') ? 'image' : 'text', { enter: true });
       Canvas.addLink(card.dataset.parent, card.id);
       requestAnimationFrame(() => card.classList.remove('entering'));
-      if (typeof Canvas !== 'undefined') Canvas.fit(true); // re-frames only until first touch
       last = card;
     };
     // spawn in chain order: a card's parent is always already on the board
@@ -475,7 +493,6 @@ const UI = (() => {
     for (const card of all) {
       if (!card.dataset.kind) { expanders.delete(card); card.remove(); }
     }
-    if (last && alive() && typeof Canvas !== 'undefined') Canvas.reveal(last);
   }
 
   // Esc: cards already out stay; expanded wells fold back, staggered top → bottom
@@ -493,20 +510,26 @@ const UI = (() => {
   /* ---- index overlay */
   function showIndex() {
     buildIndex();
-    $('index-overlay').classList.remove('hidden');
+    const o = $('index-overlay');
+    o.scrollTop = 0;
+    o.setAttribute('aria-hidden', 'false');
+    o.classList.add('is-open');
   }
 
   function hideIndex() {
-    $('index-overlay').classList.add('hidden');
+    const o = $('index-overlay');
+    o.setAttribute('aria-hidden', 'true');
+    o.classList.remove('is-open');
   }
 
   function buildIndex() {
     $('index-title').textContent = 'index · ' + Memory.entries.length + ' memories';
     const grid = $('index-grid');
     grid.innerHTML = '';
-    for (const e of Memory.entries) {
+    Memory.entries.forEach((e, i) => {
       const card = document.createElement('section');
       card.className = 'node index-card';
+      card.style.setProperty('--i', i);   // stagger the entrance
 
       const head = document.createElement('header');
       head.className = 'node__head';
@@ -518,7 +541,10 @@ const UI = (() => {
       const body = document.createElement('div');
       body.className = 'node__body';
       body.textContent = e.section; // fallback: section letters as placeholder
-      Memory.firstImage(e).then(url => {
+      // thumbnail: the doc's first inline image, else its first image attachment
+      const attImg = (e.attachments || []).find(a => /\.(jpe?g|png|webp)$/i.test(a));
+      Memory.firstImage(e).then(url => url ||
+        (attImg ? new URL(attImg, new URL(e.file, document.baseURI)).href : null)).then(url => {
         if (!url) return;
         body.textContent = '';
         body.classList.add('has-image');
@@ -537,10 +563,9 @@ const UI = (() => {
       rows.appendChild(metaRow('Section', e.section));
       meta.appendChild(rows);
 
-      const more = document.createElement('a');
-      more.className = 'node__more';
-      more.href = '#';
-      more.textContent = 'See more';
+      const more = document.createElement('span');
+      more.className = 'index-card__more';
+      more.textContent = 'open';
 
       card.appendChild(head);
       card.appendChild(body);
@@ -552,7 +577,7 @@ const UI = (() => {
         Agent.showEntry(e);
       });
       grid.appendChild(card);
-    }
+    });
   }
 
   function initOutput() {
