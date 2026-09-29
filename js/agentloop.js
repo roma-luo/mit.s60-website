@@ -15,6 +15,11 @@
 const AgentLoop = (() => {
   const MAX_STEPS = 5;
   const MAX_SHOWN = 3;
+  // the OUTPUT well holds ~128 words (~650 chars) as one paragraph, fewer
+  // once split, and its bottom lines sit under the fade: answers aim for
+  // 60 words and are held to 450 chars
+  const MAX_WORDS = 60;
+  const MAX_CHARS = 450;
 
   function systemPrompt() {
     return [
@@ -26,7 +31,8 @@ const AgentLoop = (() => {
       "Tools: recall(query) searches your memory; show(ids) pulls memories out for the visitor.",
       "Recall at least once before answering questions about the course.",
       "If your answer is about specific memories (a week, a project idea), call show with all their ids BEFORE answering.",
-      "Each memory you show appears to the visitor as its own card next to your answer. Do not describe the documents in full; summarise, the cards carry the detail."
+      "Each memory you show appears to the visitor as its own card next to your answer. Do not describe the documents in full; summarise, the cards carry the detail.",
+      `Length: at most ${MAX_WORDS} words, at most two short paragraphs. Your answer sits in a small window; anything longer is cut off.`
     ].join('\n');
   }
 
@@ -96,6 +102,22 @@ const AgentLoop = (() => {
     return 'Unknown tool ' + call.function.name + '. Use recall or show.';
   }
 
+  // the answer must fit the OUTPUT well: one rewrite request if it runs
+  // long, then a hard trim at the last whole sentence (never mid-sentence)
+  async function fit(text, messages, chat) {
+    if (text.length <= MAX_CHARS) return text;
+    try {
+      const msg = await chat([...messages, { role: 'assistant', content: text },
+        { role: 'user', content: `Too long for the window. Rewrite it in under ${MAX_WORDS} words, same facts, same voice, plain text, no tools.` }]);
+      const shorter = (msg.content || '').trim();
+      if (shorter && !LEAK.test(shorter) && shorter.length < text.length) text = shorter;
+    } catch (e) { /* keep the long one and trim it below */ }
+    if (text.length <= MAX_CHARS) return text;
+    const cut = text.slice(0, MAX_CHARS);
+    const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('.\n'), cut.lastIndexOf('? '), cut.lastIndexOf('! '));
+    return end > MAX_CHARS * 0.4 ? cut.slice(0, end + 1).trim() : cut.replace(/\s+\S*$/, '') + '…';
+  }
+
   async function answer(query, chat) {
     const messages = [
       { role: 'system', content: systemPrompt() },
@@ -108,7 +130,7 @@ const AgentLoop = (() => {
       const calls = msg.tool_calls || [];
       const text = (msg.content || '').trim();
       if (!calls.length) {
-        if (text && !LEAK.test(text)) return { text, docIds: [...docIds] };
+        if (text && !LEAK.test(text)) return { text: await fit(text, messages, chat), docIds: [...docIds] };
         // leaked tool markup (or nothing): don't show it, ask again
         messages.push({ role: 'assistant', content: text || '(empty)' });
         messages.push({ role: 'user', content: 'Use the tools API for tool calls, never text markup. If you are done, answer the visitor in plain text.' });
