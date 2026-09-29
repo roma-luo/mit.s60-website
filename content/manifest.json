@@ -260,10 +260,15 @@
         "calendar plus plus",
         "calendar",
         "goal agents",
-        "weekly meeting"
+        "weekly meeting",
+        "screenshot",
+        "demo"
       ],
       "file": "content/week2/calendar-plus-plus.md",
-      "answer": "My week two build, Calendar++: an agent-driven calendar. Each agent holds one of my life goals and argues for time in a weekly meeting. Rules allocate the week, I sign it, and every calendar block traces back to a goal. It is not an assistant, a to-do list, or a coach."
+      "answer": "My week two build, Calendar++: an agent-driven calendar. Each agent holds one of my life goals and argues for time in a weekly meeting. Rules allocate the week, I sign it, and every calendar block traces back to a goal. It is not an assistant, a to-do list, or a coach.",
+      "attachments": [
+        "calendarpp-screenshot.jpg"
+      ]
     },
     {
       "id": "week2-tech",

@@ -31,7 +31,10 @@ const CHUNK_MAX = 1200;
 const CHUNK_OVERLAP = 150;
 const EMBED_BATCH = 100;
 
+// CRLF (a file saved on Windows) would hide every `## ` heading from the
+// chunker's /^##\s+(.*)$/ and merge sections: normalise line endings first
 export function parseFrontMatter(src) {
+  src = src.replace(/\r\n?/g, '\n');
   const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
   if (!m) return { data: {}, body: src };
   const data = {};
