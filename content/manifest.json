@@ -262,12 +262,15 @@
         "goal agents",
         "weekly meeting",
         "screenshot",
-        "demo"
+        "demo",
+        "demo video",
+        "recording"
       ],
       "file": "content/week2/calendar-plus-plus.md",
       "answer": "My week two build, Calendar++: an agent-driven calendar. Each agent holds one of my life goals and argues for time in a weekly meeting. Rules allocate the week, I sign it, and every calendar block traces back to a goal. It is not an assistant, a to-do list, or a coach.",
       "attachments": [
-        "calendarpp-screenshot.jpg"
+        "calendarpp-screenshot.jpg",
+        "recording-demo.mp4"
       ]
     },
     {

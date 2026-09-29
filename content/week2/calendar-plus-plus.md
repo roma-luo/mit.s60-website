@@ -5,8 +5,8 @@ title: Week 2 Weekly Build — Calendar++
 section: week 2
 answer: My week two build, Calendar++: an agent-driven calendar. Each agent holds one of my life goals and argues for time in a weekly meeting. Rules allocate the week, I sign it, and every calendar block traces back to a goal. It is not an assistant, a to-do list, or a coach.
 tags: [week2, build, calendar, agents, goals, multi-agent, debate, concept]
-keywords: [week 2, week two, second week, weekly build, calendar++, calendar plus plus, calendar, goal agents, weekly meeting, screenshot, demo]
-attachments: [calendarpp-screenshot.jpg]
+keywords: [week 2, week two, second week, weekly build, calendar++, calendar plus plus, calendar, goal agents, weekly meeting, screenshot, demo, demo video, recording]
+attachments: [calendarpp-screenshot.jpg, recording-demo.mp4]
 ---
 # Calendar++ Concept Document
 
