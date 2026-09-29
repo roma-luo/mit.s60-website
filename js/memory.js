@@ -64,18 +64,23 @@ const Memory = (() => {
   }
 
   // first real paragraph of the doc (skipping headings, blockquotes, tables,
-  // fences, hr, list items, blanks), cut at 220 chars
+  // fences, hr, list items, blanks and short byline/date lines), markdown
+  // emphasis stripped, cut at 220 chars
   async function excerpt(entry) {
     try {
       const md = await fetchDoc(entry);
-      const buf = [];
+      const paras = [];
+      let buf = [];
       for (const raw of md.split('\n')) {
         const l = raw.trim();
         const structural = !l || /^#|^>|^\||^```|^---|^\s*[-*]\s|^\s*\d+[.)]\s|!?\[/.test(l);
-        if (structural) { if (buf.length) break; continue; }
+        if (structural) { if (buf.length) { paras.push(buf.join(' ')); buf = []; } continue; }
         buf.push(l);
       }
-      const text = buf.join(' ');
+      if (buf.length) paras.push(buf.join(' '));
+      // skip a byline / date line ("Sep 28, 2026 · @Roma"): first real paragraph wins
+      const pick = paras.find(p => p.length >= 40) || paras[0] || '';
+      const text = pick.replace(/\*\*|__|`/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
       return text.length > 220 ? text.slice(0, 220).trimEnd() + '…' : text;
     } catch (e) { return ''; }
   }

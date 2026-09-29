@@ -235,6 +235,35 @@
       ],
       "file": "content/week1/compliance-report.md",
       "answer": "The compliance report for the week one agent: each assignment requirement mapped to the module that satisfies it, from observations and actions to stopping conditions, the local model, and the hand-written loop. It ends with the outstanding items before submission."
+    },
+    {
+      "id": "week2-calendar",
+      "label": "WEEK 02 BUILD",
+      "title": "Week 2 Weekly Build — Calendar++",
+      "section": "week 2",
+      "tags": [
+        "week2",
+        "build",
+        "calendar",
+        "agents",
+        "goals",
+        "multi-agent",
+        "debate",
+        "concept"
+      ],
+      "keywords": [
+        "week 2",
+        "week two",
+        "second week",
+        "weekly build",
+        "calendar++",
+        "calendar plus plus",
+        "calendar",
+        "goal agents",
+        "weekly meeting"
+      ],
+      "file": "content/week2/calendar-plus-plus.md",
+      "answer": "My week two build, Calendar++: an agent-driven calendar. Each agent holds one of my life goals and argues for time in a weekly meeting. Rules allocate the week, I sign it, and every calendar block traces back to a goal. It is not an assistant, a to-do list, or a coach."
     }
   ]
 }
