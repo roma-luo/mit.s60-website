@@ -507,7 +507,61 @@ const UI = (() => {
     if (typeof Canvas !== 'undefined') Canvas.fit(true);
   }
 
-  /* ---- index overlay */
+  /* ---- memory bar: the dot opens a column of one-word buttons on the
+   * right edge. Groups come from the manifest, so a new week appears on its
+   * own: each "week N" section is one button (in week order), other
+   * sections one button each, and "meta" splits into its memories (about,
+   * ai disclosure, self — labelled by their own short label). */
+  function memoryGroups() {
+    const bySection = new Map();
+    for (const e of Memory.entries) {
+      if (!bySection.has(e.section)) bySection.set(e.section, []);
+      bySection.get(e.section).push(e);
+    }
+    const weekNo = s => +((s.match(/^week\s*(\d+)/i) || [])[1] || NaN);
+    const sections = [...bySection.keys()].filter(s => s !== 'meta');
+    const weeks = sections.filter(s => !isNaN(weekNo(s))).sort((a, b) => weekNo(a) - weekNo(b));
+    const rest = sections.filter(s => isNaN(weekNo(s)));
+    return [
+      ...[...weeks, ...rest].map(s => ({ label: s.toLowerCase(), entries: bySection.get(s) })),
+      ...(bySection.get('meta') || []).map(e => ({ label: Memory.label(e).toLowerCase(), entries: [e] }))
+    ];
+  }
+
+  let barBuilt = false;
+  function buildBar() {
+    const bar = $('memory-bar');
+    bar.innerHTML = '';
+    memoryGroups().forEach((g, i) => {
+      const b = document.createElement('button');
+      b.className = 'btn';
+      b.type = 'button';
+      b.style.setProperty('--i', i);   // stagger the entrance
+      b.innerHTML = '<span class="btn__dot"></span><span class="btn__label"></span>';
+      b.querySelector('.btn__label').textContent = g.label;
+      b.addEventListener('click', () => {
+        bar.querySelectorAll('.btn.is-open').forEach(o => o.classList.remove('is-open'));
+        b.classList.add('is-open');
+        Agent.showEntries(g.entries, g.label);
+      });
+      bar.appendChild(b);
+    });
+    barBuilt = true;
+  }
+
+  function toggleBar(open) {
+    const bar = $('memory-bar');
+    if (!barBuilt) buildBar();
+    open = open === undefined ? !bar.classList.contains('is-open') : open;
+    bar.classList.toggle('is-open', open);
+    bar.setAttribute('aria-hidden', String(!open));
+    $('index-dot').classList.toggle('is-open', open);
+    // while open, camera framing keeps cards out from under the bar
+    const r = bar.getBoundingClientRect();
+    Canvas.reserveRight(open ? window.innerWidth - r.left + 16 : 0);
+  }
+
+  /* ---- index overlay (the full grid; typed as /index) */
   function showIndex() {
     buildIndex();
     const o = $('index-overlay');
@@ -589,7 +643,7 @@ const UI = (() => {
     setAnswer, startReveal, revealAnswer, finishReveal,
     spawnChildren, cancelSpawn: () => { spawnGen++; spawnRound = null; },
     collapseChildren,
-    showIndex, hideIndex, initOutput
+    showIndex, hideIndex, initOutput, toggleBar
   };
 })();
 
@@ -662,6 +716,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
     if (ev.key === 'Escape') {
       UI.hideIndex();
+      UI.toggleBar(false);
       Agent.cancel();
       return;
     }
@@ -690,10 +745,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  document.getElementById('index-dot').addEventListener('click', () => {
-    Agent.cancel();
-    UI.showIndex();
-  });
+  // the dot toggles the memory bar (the full grid stays on /index)
+  document.getElementById('index-dot').addEventListener('click', () => UI.toggleBar());
   document.getElementById('index-overlay').addEventListener('click', ev => {
     if (!ev.target.closest('.node')) UI.hideIndex();
   });

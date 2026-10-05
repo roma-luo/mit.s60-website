@@ -102,5 +102,17 @@ const Agent = (() => {
     setState('showing');
   }
 
-  return { handle, cancel, setState, showEntry };
+  // memory-bar button picked — a group of memories (a week, the final
+  // project) comes out as one chain; OUTPUT lists what came out. No brain,
+  // no speech.
+  async function showEntries(entries, heading) {
+    if (entries.length === 1) return showEntry(entries[0]);
+    interrupt();
+    Face.setMouth(0);
+    await UI.setAnswer({ text: heading + '\n\n' + entries.map(e => e.title).join('\n') });
+    UI.spawnChildren(entries);
+    setState('showing');
+  }
+
+  return { handle, cancel, setState, showEntry, showEntries };
 })();

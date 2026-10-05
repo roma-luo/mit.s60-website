@@ -262,21 +262,26 @@ const Canvas = (() => {
     applyView();
   }
 
-  // frame a set of boxes {x, y, w, h} (canvas px) in the viewport
+  // screen px kept clear on the right by an overlay (the open memory bar)
+  let reservedRight = 0;
+
+  // frame a set of boxes {x, y, w, h} (canvas px) in the viewport, minus
+  // whatever an overlay has reserved on the right
   function frameRects(rects, animate) {
     const r = stage.getBoundingClientRect();
     const pad = 40;
+    const width = r.width - reservedRight;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     rects.forEach(b => {
       x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
       x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h);
     });
     if (x0 === Infinity) return;
-    const s = clamp(Math.min((r.width - 2 * pad) / (x1 - x0),
+    const s = clamp(Math.min((width - 2 * pad) / (x1 - x0),
                              (r.height - 2 * pad) / (y1 - y0)), ZMIN, 1);
     viscous = false;
     view.ts = s;
-    view.tx = (r.width - (x1 - x0) * s) / 2 - x0 * s;
+    view.tx = (width - (x1 - x0) * s) / 2 - x0 * s;
     view.ty = (r.height - (y1 - y0) * s) / 2 - y0 * s;
     if (animate) kick(); else snapView();
   }
@@ -512,6 +517,7 @@ const Canvas = (() => {
     init, register, removeWindow, addLink, removeLinksTo, setFlow, refreshPorts,
     reveal, fitAll, zoomBy, frameRects, box,
     get touched() { return touched; },
+    reserveRight: px => { reservedRight = Math.max(0, px || 0); },
     fit: animate => { if (!touched) fitAll(animate); },
     home: animate => { touched = false; fitAll(animate); },
     reflow: ms => { reflowUntil = performance.now() + ms; kick(); },
