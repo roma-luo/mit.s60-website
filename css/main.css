@@ -423,7 +423,9 @@ html, body, * { scrollbar-width: none; }
   overflow: hidden;
   touch-action: none;
   background: var(--bg);
+  cursor: grab;                 /* empty space drags the board */
 }
+.stage.is-panning, .stage.is-panning * { cursor: grabbing; }
 .canvas {
   position: absolute;
   left: 0;

@@ -2,7 +2,7 @@
  *
  * A fixed full-viewport stage; every window is a free body on the board.
  * Windows drag with a viscous feel, the wheel zooms the board anchored at
- * the cursor, and fit-all frames everything (empty space does not pan). Ports on the meta rows
+ * the cursor, dragging empty space pans the board, and fit-all frames everything. Ports on the meta rows
  * wire windows together; wires follow translate/rotate/scale every frame.
  *
  * Public API (kept compatible with the previous canvas driver):
@@ -309,7 +309,13 @@ const Canvas = (() => {
   /* ==================== pointers: drag / pan / pinch ==================== */
   let touched = false;
   const pts = new Map();
-  let drag = null, pinch = null;
+  let drag = null, pinch = null, pan = null;
+
+  function endPan() {
+    if (!pan) return;
+    pan = null;
+    stage.classList.remove('is-panning');
+  }
 
   function endWindowDrag() {
     if (!drag) return;
@@ -320,6 +326,7 @@ const Canvas = (() => {
   }
   function startPinch() {
     endWindowDrag();
+    endPan();
     const [a, b] = [...pts.values()];
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: view.s, c0: toCanvas(mid.x, mid.y) };
@@ -334,19 +341,22 @@ const Canvas = (() => {
     if (pts.size === 2) { startPinch(); return; }
     if (pts.size > 2) return;
 
-    // windows drag; empty space does NOT pan (wheel-only zoom + fit-all)
+    // a window drags itself; empty space pans the whole board
     const el = e.target.closest('.node');
-    if (el && byId[el.id]) {
-      const n = byId[el.id], p = toCanvas(e.clientX, e.clientY);
-      drag = { n, id: e.pointerId, ox: p.x - n.tx, oy: p.y - n.ty,
-               sx: e.clientX, sy: e.clientY, stuck: BREAK > 0 };
-      n.lever = clamp((el.offsetHeight / 2 - drag.oy) / (el.offsetHeight / 2), -1, 1);
-      n.z = ++z;
-      restack();
-      el.classList.add('is-dragging');
-      n.ts = LIFT;
-      kick();
+    if (!el || !byId[el.id]) {
+      pan = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      stage.classList.add('is-panning');
+      return;
     }
+    const n = byId[el.id], p = toCanvas(e.clientX, e.clientY);
+    drag = { n, id: e.pointerId, ox: p.x - n.tx, oy: p.y - n.ty,
+             sx: e.clientX, sy: e.clientY, stuck: BREAK > 0 };
+    n.lever = clamp((el.offsetHeight / 2 - drag.oy) / (el.offsetHeight / 2), -1, 1);
+    n.z = ++z;
+    restack();
+    el.classList.add('is-dragging');
+    n.ts = LIFT;
+    kick();
   }
 
   function onPointerMove(e) {
@@ -362,6 +372,12 @@ const Canvas = (() => {
       view.tx = mid.x - r.left - pinch.c0.x * s;
       view.ty = mid.y - r.top - pinch.c0.y * s;
       snapView();
+      return;
+    }
+    if (pan && e.pointerId === pan.id) {
+      panView(e.clientX - pan.x, e.clientY - pan.y);   // the board follows the pointer 1:1
+      pan.x = e.clientX;
+      pan.y = e.clientY;
       return;
     }
     if (drag && e.pointerId === drag.id) {
@@ -381,6 +397,7 @@ const Canvas = (() => {
     pts.delete(e.pointerId);
     if (pinch && pts.size < 2) pinch = null;
     if (drag && e.pointerId === drag.id) endWindowDrag();
+    if (pan && e.pointerId === pan.id) endPan();
   };
 
   /* ============================ the loop ============================ */
