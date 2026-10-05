@@ -244,6 +244,7 @@ const Canvas = (() => {
     const r = stage.getBoundingClientRect();
     const px = sx - r.left, py = sy - r.top;
     const cx = (px - view.tx) / view.ts, cy = (py - view.ty) / view.ts;
+    viscous = false;
     view.ts = clamp(s, ZMIN, ZMAX);
     view.tx = px - cx * view.ts;
     view.ty = py - cy * view.ts;
@@ -273,6 +274,7 @@ const Canvas = (() => {
     if (x0 === Infinity) return;
     const s = clamp(Math.min((r.width - 2 * pad) / (x1 - x0),
                              (r.height - 2 * pad) / (y1 - y0)), ZMIN, 1);
+    viscous = false;
     view.ts = s;
     view.tx = (r.width - (x1 - x0) * s) / 2 - x0 * s;
     view.ty = (r.height - (y1 - y0) * s) / 2 - y0 * s;
@@ -310,6 +312,7 @@ const Canvas = (() => {
   let touched = false;
   const pts = new Map();
   let drag = null, pinch = null, pan = null;
+  let viscous = false;   // the view is easing with drag viscosity (a pan, or its settle after release)
 
   function endPan() {
     if (!pan) return;
@@ -344,7 +347,7 @@ const Canvas = (() => {
     // a window drags itself; empty space pans the whole board
     const el = e.target.closest('.node');
     if (!el || !byId[el.id]) {
-      pan = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      pan = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, stuck: BREAK > 0 };
       stage.classList.add('is-panning');
       return;
     }
@@ -375,9 +378,19 @@ const Canvas = (() => {
       return;
     }
     if (pan && e.pointerId === pan.id) {
-      panView(e.clientX - pan.x, e.clientY - pan.y);   // the board follows the pointer 1:1
+      // same viscous feel as a window drag: the board holds until the
+      // pointer breaks free, then its target moves 1:1 and the view eases
+      // after it through FOLLOW (see tick); on release it settles, no throw
+      if (pan.stuck) {
+        if (Math.hypot(e.clientX - pan.sx, e.clientY - pan.sy) < BREAK) return;
+        pan.stuck = false;
+      }
+      viscous = true;
+      view.tx += e.clientX - pan.x;
+      view.ty += e.clientY - pan.y;
       pan.x = e.clientX;
       pan.y = e.clientY;
+      kick();
       return;
     }
     if (drag && e.pointerId === drag.id) {
@@ -409,7 +422,9 @@ const Canvas = (() => {
     last = t;
     const f  = 1 - Math.pow(1 - FOLLOW, dt * 60);
     const fe = 1 - Math.pow(1 - EASE, dt * 60);
-    const fv = 1 - Math.pow(1 - VIEW_EASE, dt * 60);
+    // a pan trails the pointer with the window-drag viscosity, and keeps it
+    // through the settle after release; zoom / fit glides ease quicker
+    const fv = 1 - Math.pow(1 - (viscous ? FOLLOW : VIEW_EASE), dt * 60);
     let busy = false;
 
     for (const n of nodes) {
@@ -430,7 +445,7 @@ const Canvas = (() => {
       view.y += (view.ty - view.y) * fv;
       view.s += (view.ts - view.s) * fv;
       if (Math.abs(view.tx - view.x) < 0.05 && Math.abs(view.ty - view.y) < 0.05 &&
-          Math.abs(view.ts - view.s) < 0.0002) { view.x = view.tx; view.y = view.ty; view.s = view.ts; }
+          Math.abs(view.ts - view.s) < 0.0002) { view.x = view.tx; view.y = view.ty; view.s = view.ts; viscous = false; }
       else busy = true;
       applyView();
     }
