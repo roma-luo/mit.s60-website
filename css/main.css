@@ -575,13 +575,13 @@ img, video { -webkit-user-drag: none; }
 #index-dot:hover { background: #ffffff; }
 #index-dot.is-open { background: #ffffff; box-shadow: 0 0 8px rgba(255,255,255,0.55); }
 
-/* memory bar: a column of one-word buttons (the send button's design) on
-   the right edge, opened by the dot; buttons slide in one after another */
+/* memory bar: a column of one-word buttons (the send button's design)
+   standing on top of the dot that opens it; buttons slide in one after
+   another */
 #memory-bar {
   position: fixed;
   right: 18px;
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: 38px;                  /* dot: bottom 18 + 8 tall + 12 gap */
   z-index: 15;
   display: flex;
   flex-direction: column;
