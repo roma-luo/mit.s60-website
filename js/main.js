@@ -226,7 +226,14 @@ const UI = (() => {
     wellText.appendChild(p);
     well.appendChild(wellText);
     body.appendChild(well);
-    Memory.excerpt(entry).then(t => { if (!card.dataset.full) p.textContent = t || entry.answer; });
+    // the whole document goes in the well (the fade + expand show the rest);
+    // spawnChildren waits for it, then fitShort decides the window kind
+    card.mediaReady = Memory.fetchDoc(entry).then(md => {
+      wellText.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
+    }, () => {
+      wellText.innerHTML = '<p>(this memory could not be loaded)</p>';
+      card.dataset.failed = '1';
+    });
 
     const meta = document.createElement('footer');
     meta.className = 'node__meta';
@@ -246,17 +253,29 @@ const UI = (() => {
     card.appendChild(body);
     card.appendChild(meta);
 
-    expanders.set(card, initWellExpand(card, async () => {
-      // first expand: swap the excerpt for the full markdown document
-      card.dataset.full = '1';
-      try {
-        const md = await Memory.fetchDoc(entry);
-        wellText.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
-      } catch (err) {
-        wellText.innerHTML = '<p>(this memory could not be loaded)</p>';
-      }
-    }));
+    expanders.set(card, initWellExpand(card));
     return card;
+  }
+
+  // the filter between the two window kinds: a mounted long card whose whole
+  // document, set at short-text size, is no taller than the well becomes a
+  // short card (text on the face, no well, no expand); anything longer stays
+  // long. Measured, not counted: headings, lists and images all take room.
+  function fitShort(card) {
+    if (!card.classList.contains('node--long') || card.dataset.failed) return;
+    const well = card.querySelector('.well');
+    const doc = document.createElement('div');
+    doc.className = 'short__text short__doc';
+    doc.innerHTML = card.querySelector('.well__text').innerHTML;
+    const body = card.querySelector('.node__body');
+    const room = well.clientHeight;
+    body.appendChild(doc);
+    if (doc.offsetHeight > room) { doc.remove(); expanders.get(card)?.measure(); return; }
+    well.remove();
+    card.querySelector('.node__more')?.remove();
+    card.classList.replace('node--long', 'node--short');
+    card.classList.remove('is-fit');
+    expanders.delete(card);
   }
 
   // proposals are short text: no well, no expand — the one-paragraph answer
@@ -467,6 +486,7 @@ const UI = (() => {
     const media = all.map(c => c.mediaReady).filter(Boolean);
     if (media.length) await Promise.race([Promise.all(media), delay(2500)]);
     if (!alive()) { all.forEach(c => { expanders.delete(c); c.remove(); }); return; }
+    all.forEach(fitShort);
     const order = layoutChain(all);
     // glide the camera before the cards arrive: the whole board while the
     // visitor hasn't taken over the view, else OUTPUT + the new chain
