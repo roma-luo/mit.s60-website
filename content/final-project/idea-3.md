@@ -1,7 +1,7 @@
 ---
 id: fp-3
 label: FINAL IDEA 03
-title: Idea 3 — Wormhole
+title: Idea 3: Wormhole
 section: final project
 answer: Idea three: Wormhole. Neuroimaging shows we imagine our future selves like strangers. This agent answers in the voice of your future self, re-weighting the values and long-term goals you have recorded.
 tags: [final, project, idea, proposal, attention, focus, synthesis, notifications]

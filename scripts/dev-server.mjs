@@ -1,4 +1,4 @@
-/* dev-server.mjs — local server without `vercel dev`: serves the static
+/* dev-server.mjs: local server without `vercel dev`: serves the static
  * site and mounts api/*.js with a minimal Vercel-style req/res shim, so the
  * local site runs the same live brain (DeepSeek via /api/chat) as production.
  * Reads .env from the project root. Zero dependencies.
@@ -22,7 +22,7 @@ if (existsSync(envPath)) {
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
   }
 }
-if (!process.env.DEEPSEEK_API_KEY) console.warn('warning: DEEPSEEK_API_KEY not set — /api/chat will return 500');
+if (!process.env.DEEPSEEK_API_KEY) console.warn('warning: DEEPSEEK_API_KEY not set: /api/chat will return 500');
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',

@@ -1,10 +1,10 @@
-/* MAS S60 — Digital Self · node-board edition.
+/* MAS S60: Digital Self · node-board edition.
  * Design system ported from the node-board handoff (DESIGN.md):
  * beveled black chassis with masked rims, dark text wells, full-pill
  * buttons, free windows on a pannable/zoomable board. Ground #0a0a0a so
  * the cast shadows have something to darken.
  *
- * R3: never promote layers — no will-change/transform3d on the canvas or
+ * R3: never promote layers: no will-change/transform3d on the canvas or
  * windows, so zoomed text is re-rasterised and stays sharp. */
 
 :root {
@@ -243,7 +243,7 @@ html, body, * { scrollbar-width: none; }
 }
 .btn__label {
   display: inline-block;
-  min-width: 65px;      /* the wider label (collapse, 64px) — pill must not resize */
+  min-width: 65px;      /* the wider label (collapse, 64px): pill must not resize */
   text-align: center;
 }
 .btn__dot {
@@ -445,7 +445,7 @@ html, body, * { scrollbar-width: none; }
   width: 4000px;
   height: 3000px;
   transform-origin: 0 0;
-  /* R3: no will-change here or on the windows — a promoted layer is
+  /* R3: no will-change here or on the windows: a promoted layer is
      rasterised once and then scaled as a bitmap, which blurs zoomed text.
      the canvas needs a real size: an svg layer at 0x0 never paints, so
      wires and ports vanish even with overflow: visible. */
@@ -461,7 +461,7 @@ html, body, * { scrollbar-width: none; }
           user-select: none;
   transition: box-shadow 240ms ease;
 }
-/* nothing on the board is selectable — the whole window is the drag handle;
+/* nothing on the board is selectable: the whole window is the drag handle;
    the only exception is the INPUT textarea, re-enabled below */
 .stage, #index-overlay {
   -webkit-user-select: none;

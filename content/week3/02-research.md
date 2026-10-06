@@ -1,7 +1,7 @@
 ---
 id: week3-research
 label: WEEK 03 RESEARCH
-title: Week 3 Research — calibrating human judgment of AI capability
+title: Week 3 Research: calibrating human judgment of AI capability
 section: week 3
 answer: The research behind my week three build. AI help can raise performance while eroding the skill underneath, and once execution is delegated, the critical skill becomes judging where AI succeeds and fails: the jagged frontier. Calibration is learned through explicit predictions and fast feedback, which everyday AI use never gives.
 tags: [week3, research, calibration, jagged frontier, mental models, cognition, interfaces]
@@ -10,7 +10,7 @@ attachments: [research-frontier.jpg, research-evidence.jpg]
 ---
 # Research: Calibrating Human Judgment of AI Capability
 
-*Background research for Week 3 of MAS S60 (human–agent interfaces for cognitive augmentation).*
+*Background research for Week 3 of MAS S60 (human-agent interfaces for cognitive augmentation).*
 *Figures referenced below are in `images/`.*
 
 ---
@@ -28,7 +28,7 @@ known about building interfaces that train that capacity.
 
 ## 2. AI assistance can raise performance while eroding the underlying skill
 
-A consistent pattern has emerged from controlled studies in 2023–2026: unguided AI help improves
+A consistent pattern has emerged from controlled studies from 2023 to 2026: unguided AI help improves
 immediate output but can degrade independent ability, understanding, or ownership. The interaction
 design, not the model, largely determines which effect dominates.
 
@@ -64,8 +64,8 @@ succeeds and fails.**
   designed to fall outside the frontier, consultants using AI were **less likely to reach the correct
   answer** than those working without it. The frontier is *jagged*: tasks of similar apparent difficulty
   can fall on opposite sides, so intuition about "hard" versus "easy" is an unreliable guide.
-- **Mental models in human–AI teams.** Bansal et al. (2019, *HCOMP*) showed that the performance of a
-  human–AI team depends on whether the human can **anticipate when the AI will err**, not only on the
+- **Mental models in human-AI teams.** Bansal et al. (2019, *HCOMP*) showed that the performance of a
+  human-AI team depends on whether the human can **anticipate when the AI will err**, not only on the
   AI's accuracy. A follow-up (Bansal et al., 2019, *AAAI*) showed that **updating the AI can break the
   human's mental model** and lower team performance even when the new model is more accurate.
 
@@ -134,7 +134,7 @@ provoking reflection, supporting metacognition, and exposing uncertainty rather 
 
 ---
 
-## 6. Human–technology relations as a design lens
+## 6. Human-technology relations as a design lens
 
 Ihde's (1990) four relations, discussed in class, map onto the design options:
 

@@ -1,7 +1,7 @@
 ---
 id: week2-tech
 label: WEEK 02 TECH
-title: Week 2 Build Notes — Calendar++ architecture and tools
+title: Week 2 Build Notes: Calendar++ architecture and tools
 section: week 2
 answer: The technical notes for Calendar++, my week two build: a native macOS app in Swift, not smolagents, because the rule is that the model proposes and code decides. Four isolated ministers bid for my hours through forced tool calls, a clerk splits contested time by formula, and nothing is scheduled until I sign. It maps each smolagents concept to its Swift file and states the gaps openly.
 tags: [week2, build, calendar, architecture, swift, tools, mcp, harness, agents, diagram]

@@ -1,6 +1,6 @@
 /* Vercel serverless function: DeepSeek proxy.
  * The key lives ONLY in env vars (local .env, Vercel dashboard for
- * production) — never in client JS, never in the repo.
+ * production): never in client JS, never in the repo.
  *
  *   POST /api/chat  { "messages": [...] }  → DeepSeek chat completion
  *
@@ -40,7 +40,7 @@ const TOOLS = [
   }
 ];
 
-const RATE = 40;              // requests per IP per window (one answer ≈ 3–5 calls)
+const RATE = 40;              // requests per IP per window (one answer ≈ 3 to 5 calls)
 const WINDOW_MS = 60000;
 const MAX_MESSAGES = 24;
 const MAX_CHARS = 60000;

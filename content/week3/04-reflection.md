@@ -1,7 +1,7 @@
 ---
 id: week3-reflection
 label: WEEK 03 REFLECTION
-title: Week 3 Reflection — Frontier Map
+title: Week 3 Reflection: Frontier Map
 section: week 3
 answer: My reflection on Frontier Map. One-click prediction and history-driven warnings worked; the hold still risks reflex clicking, and task segmentation is the weakest part. Three real tasks show the loop works, not that it calibrates anyone yet. Most of the effort went into sensing, timing, focus and animation, not the LLM.
 tags: [week3, reflection, lessons, evaluation, ai disclosure]

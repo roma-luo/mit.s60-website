@@ -1,4 +1,4 @@
-/* Boot v2 — real loading progress for the entry overlay. The overlay's
+/* Boot v2: real loading progress for the entry overlay. The overlay's
  * markup, critical CSS, suppression check and skip/failsafe bootstrap are
  * INLINE in index.html, so it paints on the first frame even if every later
  * script errors. This file only preloads the real assets (fully, so they

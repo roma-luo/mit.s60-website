@@ -1,7 +1,7 @@
 ---
 id: week3-perspective
 label: WEEK 03 PERSPECTIVE
-title: Week 3 Perspective — cognition moves upward
+title: Week 3 Perspective: cognition moves upward
 section: week 3
 answer: My view behind Frontier Map: delegating execution does not empty my head, it moves thinking upward, to setting goals and keeping a graph in my head of what AI can do. The interface should be light and invisible, every delegation counts, and the agent is a mirror, neither a tool nor a colleague.
 tags: [week3, perspective, cognition, delegation, design principles, mirror]
@@ -69,7 +69,7 @@ This became the manual-takeover rule: minor edits count as *success after revisi
 Before settling on Frontier Map, the author proposed a broader hypothesis that remains relevant to the
 group project:
 
-> "Human–AI collaboration is stuck in a false binary: AI is designed either as a tool (it obeys silently,
+> "Human-AI collaboration is stuck in a false binary: AI is designed either as a tool (it obeys silently,
 > like autocomplete) or as an anthropomorphic colleague (it pretends to be human, like a chat assistant).
 > Both are lies: it has more initiative than a tool, and it is not a person. My hypothesis is that a third
 > interaction grammar exists, and its prototypes are not in the office but in older practices of working

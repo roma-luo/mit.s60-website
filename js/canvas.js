@@ -1,4 +1,4 @@
-/* Canvas — the node-board engine (ported from reference/slop-instance.html).
+/* Canvas: the node-board engine (ported from reference/slop-instance.html).
  *
  * A fixed full-viewport stage; every window is a free body on the board.
  * Windows drag with a viscous feel, the wheel zooms the board anchored at
@@ -7,16 +7,16 @@
  *
  * Public API (kept compatible with the previous canvas driver):
  *   Canvas.init()
- *   Canvas.register(el, kind)     — add a board window (spawned children)
- *   Canvas.removeWindow(el)       — drop it and its wires/ports
- *   Canvas.addLink(fromId, toId)  — wire from the right edge of from to left of to
+ *   Canvas.register(el, kind): add a board window (spawned children)
+ *   Canvas.removeWindow(el): drop it and its wires/ports
+ *   Canvas.addLink(fromId, toId): wire from the right edge of from to left of to
  *   Canvas.removeLinksTo(id)
- *   Canvas.setFlow(id, on)        — dash-flow a wire ('wire-in' | 'wire-out')
- *   Canvas.reflow(ms)             — keep wires attached during an expand
- *   Canvas.reveal(el)             — glide the view so a window is on screen
- *   Canvas.fit(animate)           — fit-all until the user first touches the board
- *   Canvas.home(animate)          — fit-all on demand
- *   Canvas.zoomBy(factor, cx, cy) — zoom about a screen point (default centre)
+ *   Canvas.setFlow(id, on): dash-flow a wire ('wire-in' | 'wire-out')
+ *   Canvas.reflow(ms): keep wires attached during an expand
+ *   Canvas.reveal(el): glide the view so a window is on screen
+ *   Canvas.fit(animate): fit-all until the user first touches the board
+ *   Canvas.home(animate): fit-all on demand
+ *   Canvas.zoomBy(factor, cx, cy): zoom about a screen point (default centre)
  *   Canvas.pan(dx, dy)
  *   Canvas.setOffset(x, y, animate)
  *   Canvas.get() → { x, y, scale }
@@ -37,7 +37,7 @@ const Canvas = (() => {
   const ZMIN = 0.25, ZMAX = 4, ZSTEP = 1.25;
   const VIEW_EASE = calm ? 1 : 0.2;
 
-  /* port rule — the upper hole always connects to text, the lower hole
+  /* port rule: the upper hole always connects to text, the lower hole
      always connects to an image (CLAUDE.md R1) */
   const PORT = { text: 0, image: 1 };
 
@@ -113,7 +113,7 @@ const Canvas = (() => {
     });
   }
 
-  /* stacking — window k at z 2k, its ports at 2k+1; a wire belongs to the
+  /* stacking: window k at z 2k, its ports at 2k+1; a wire belongs to the
      window it feeds and shares that layer (CLAUDE.md R2) */
   function restack() {
     nodes.forEach(n => {
@@ -137,7 +137,7 @@ const Canvas = (() => {
     });
   }
 
-  // opts.enter: the window glides in — it starts a little low and small and
+  // opts.enter: the window glides in: it starts a little low and small and
   // eases to its place through the same viscous follow as a drag
   function register(el, kind, opts = {}) {
     if (byId[el.id]) return byId[el.id];
@@ -401,7 +401,7 @@ const Canvas = (() => {
     if (drag && e.pointerId === drag.id) {
       if (drag.stuck) {
         if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < BREAK) return;
-        drag.stuck = false;              // breaks free — the lag absorbs the jump
+        drag.stuck = false;              // breaks free: the lag absorbs the jump
       }
       const p = toCanvas(e.clientX, e.clientY);
       drag.n.tx = p.x - drag.ox;

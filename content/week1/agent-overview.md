@@ -1,7 +1,7 @@
 ---
 id: week1-overview
 label: WEEK 01 OVERVIEW
-title: Week 1 Agent Overview — the Downloads-folder naming agent
+title: Week 1 Agent Overview: the Downloads-folder naming agent
 section: week 1
 answer: The full write-up of my week one agent: a local LLM with a hand-written loop that judges what each file in a real Downloads folder is and renames it to a written naming convention. It covers the architecture, the six design decisions, real performance on four runs, and the four failure modes of a 7B model. Recordings of the process and the result are linked at the bottom.
 tags: [week1, agent, loop, naming, downloads, documentation, overview]
@@ -19,8 +19,8 @@ attachments: [recording-process.mp4, recording-outcome.mp4]
 
 An agent that works on a real Windows Downloads folder: a local LLM (offline, no agent
 framework) judges for each file "what is this and what should it be called," and renames
-it according to a written naming convention. It's fundamentally a teaching experiment —
-taking the tutorial's vending-machine observation → action → observation loop and moving
+it according to a written naming convention. It's fundamentally a teaching experiment. It takes the
+tutorial's vending-machine observation → action → observation loop and moves
 it onto a real filesystem, to see when it works, when it fails, and what failure looks like.
 
 ## Why this task deserves an agent
@@ -29,7 +29,7 @@ Every file in a Downloads folder is the fossil of one moment of attention, named
 whatever source produced it: `final_v3(2).pdf`, `1706.03762v7.pdf`, `1231212.png`.
 Judging "what is this" takes common sense (1706.03762 is an arXiv ID), which hard-coded
 rules can't cover; and whether a rename actually happened can only be learned by looking.
-Dozens of tiny judgments, each trivial, add up to something nobody ever does — exactly
+Dozens of tiny judgments, each trivial, add up to something nobody ever does. That is exactly
 the kind of work an agent is for.
 
 ## Architecture
@@ -40,10 +40,10 @@ week1/
 │                      changing behavior means editing this file, not the code)
 ├── run.py             CLI entry and the safety layer (--dry-run default / --apply / --undo / --limit)
 └── agent/
-    ├── model.py       chat(): the only model touchpoint — llama-cpp-python + local GGUF
+    ├── model.py       chat(): the only model touchpoint: llama-cpp-python + local GGUF
     ├── prefilter.py   rule-based preprocessing: exclude, dedupe, group
     ├── environment.py DownloadsFolder: the environment. read-only vs state-changing methods
-    ├── actions.py     execute(): parses one action line — a chain of ifs
+    ├── actions.py     execute(): parses one action line with a chain of ifs
     ├── prompts.py     the SYSTEM prompt + the per-turn prompt block
     ├── validate.py    the stopping conditions, checked in code (never by asking the model)
     └── loop.py        run_agent(): a for loop + chat(), 44 lines, no extra machinery
@@ -69,22 +69,22 @@ SYSTEM + messages (full history)
 
 `messages` is the agent's entire memory: **never truncated, never summarised, never
 cleared**. If the context overflows, the answer is `--limit` (fewer files), not a hidden
-mechanism inside the loop — the memory mechanism itself is this week's exhibit.
+mechanism inside the loop. The memory mechanism itself is this week's exhibit.
 
 ## Core design decisions (the "why")
 
 **1. Code/model division of labor.** Installers, partial downloads, and
 already-conforming files are filtered out by `prefilter` with rules; the model never
-sees them. Duplicate detection is sha256, group detection is mtime clustering — both
+sees them. Duplicate detection is sha256, group detection is mtime clustering. Both are
 code. The tutorial's Part 2 lesson: whatever a rule can decide, a rule should decide.
 
 **2. RENAME never reports its real result.** Inherited from the tutorial's vending
 machine (press doesn't tell you what dropped; only CHECK_TRAY knows). Name conflicts,
-illegal characters, out-of-vocabulary TYPEs, malformed names — all silently leave the
+illegal characters, out-of-vocabulary TYPEs, malformed names: all of them silently leave the
 file under its old name; the answer is always "Renamed." `VERIFY` is the only way to
 learn what a file is actually called right now. This isn't artificial cruelty: Windows
 file names are case-insensitive, and `os.rename` onto a case-variant target silently
-overwrites — no error, ever. An agent that trusts its own actions maintains a mental
+overwrites, with no error, ever. An agent that trusts its own actions maintains a mental
 model of the world that diverges from disk; forcing it to VERIFY means forcing it to
 replace assumptions with observations.
 
@@ -103,7 +103,7 @@ is printed, and only a typed `yes` persists the **final state**. `--undo` revert
 last applied batch from the log. The human keeps the final decision.
 
 **5. commit() persists only the final state.** If the agent renames a file to name1 and
-later to name2, only name2 reaches the disk — the user confirmed the mapping table, not
+later to name2, only name2 reaches the disk. The user confirmed the mapping table, not
 the journey. (This was a real bug caught in review: the original code replayed history,
 so name1 landed on disk and name2 silently failed.)
 
@@ -114,7 +114,7 @@ signal; this is the only guaranteed terminator.
 
 `[TYPE]_[Description]_[YYYYMMDD].[ext]`, e.g. `PAPER_Energy-Drink_20260919.pdf`.
 A fixed vocabulary of 12 TYPEs (PAPER/SLIDES/DOC/FORM/DATA/CODE/IMG/SCREENSHOT/MEDIA/
-BOOK/ARCHIVE/UNKNOWN) — never invented; Description is 1–2 words, hyphen-joined, no
+BOOK/ARCHIVE/UNKNOWN) that is never extended; Description is one or two words, hyphen-joined, no
 underscores, no spaces; the date is always the download date; unjudgable files get
 DEFERred to `UNKNOWN_[original-stem-fragment]_[date]`; duplicates are detected by
 content hash, later copies get `_DUP`; conflicts get `_2` (compared case-insensitively);
@@ -128,7 +128,7 @@ content hash, later copies get `_DUP`; conflicts get `_2` (compared case-insensi
   greedy decoding, matching the tutorial.
 - RTX 4080 12 GB: the prebuilt CUDA wheel was compiled for AVX-512 and crashed with an
   illegal-instruction error on this CPU, so llama-cpp-python was built from source
-  (VS Build Tools, Ninja, `-allow-unsupported-compiler`). All layers on GPU, ~1–2 s per
+  (VS Build Tools, Ninja, `-allow-unsupported-compiler`). All layers on GPU, about 1 to 2 s per
   step. A CPU wheel works as a fallback, an order of magnitude slower.
 - `peek()` extraction: separate pipelines for text/PDF/docx/zip; images go through
   Tesseract OCR (with an added chi_sim language pack); if OCR is unavailable it degrades
@@ -141,7 +141,7 @@ content hash, later copies get `_DUP`; conflicts get `_2` (compared case-insensi
 | --limit 8 | done, 30 steps | 4 | 4 | 0 |
 | --limit 8 (again) | max_iters, 64 steps | 4 | 0 | 4 |
 | --limit 12 | max_iters, 96 steps | 5 | 3 | 4 |
-| --limit 12 (again) | context blown at step 76 (63 consecutive VERIFYs) | — | — | — |
+| --limit 12 (again) | context blown at step 76 (63 consecutive VERIFYs) | n/a | n/a | n/a |
 | --limit 20 | context blown at step 129 | 9 | 2 | 8 |
 | --apply --limit 8 | persisted for real | 4 | 0 | 4 (--undo restored them) |
 
@@ -149,7 +149,7 @@ content hash, later copies get `_DUP`; conflicts get `_2` (compared case-insensi
 PEEKs files whose names can't be trusted and genuinely uses the content (it read a 20 MB
 PDF and named it SLIDES_Simulation after the book it found inside); DEFERs files with no
 usable signal instead of guessing; silent failures (conflicts, malformed names) are all
-recoverable through VERIFY — every observation window of the four failure modes works.
+recoverable through VERIFY. Every observation window of the four failure modes works.
 
 **The flaws, by frequency**:
 
@@ -161,7 +161,7 @@ recoverable through VERIFY — every observation window of the four failure mode
    spelled out, and it retries the *same* invalid name (PLAN-2.md: 12 identical RENAME
    attempts in a row, until max_iters).
 3. **VERIFY storms**: in one run, 63 of 76 steps were VERIFY, eating the entire 32k
-   context until it crashed — a textbook case of "no stuck signal," with even max_iters
+   context until it crashed. It is a textbook case of "no stuck signal," with even max_iters
    arriving too late to help.
 4. **Over-defers after failures**: files it can't rename tend to get deferred in bulk
    (4 DEFERs in a row) rather than diagnosed. Caution beats guessing, but the ratio is
@@ -185,8 +185,8 @@ the traces).
 
 ## Known limitations (documented in the README)
 
-- Untruncated `messages` ⇒ ~12–16 files is the safe scale for a 32k context; the whole
-  Downloads folder (900+) can't be done in one run — a single LIST/VERIFY alone
+- Untruncated `messages` ⇒ about 12 to 16 files is the safe scale for a 32k context; the whole
+  Downloads folder (900+) can't be done in one run, because a single LIST/VERIFY alone
   overflows it.
 - The date is always the download date, never a date found inside the content
   (a deliberate simplification).
@@ -197,14 +197,14 @@ the traces).
 ## If it were improved further
 
 - **One small independent loop per file** (PEEK → decide → rename, a few dozen tokens of
-  context) instead of one global conversation — the context problem disappears, and
+  context) instead of one global conversation. The context problem disappears, and
   files could be processed in parallel. This is the key step to production.
 - A stuck-detection layer (force DEFER after N consecutive no-op actions).
-- Write user corrections back into an examples section of NAMING.md — cross-file memory.
+- Write user corrections back into an examples section of NAMING.md, as cross-file memory.
 - A fixed test set for quantitative evaluation (dropped this week in favor of
   demonstrating on the real folder).
 - SYSTEM prompt tuning: three runs of traces point clearly at "no underscores in
-  Description," "append _2 on conflicts," "never VERIFY twice in a row" — expected to
+  Description," "append _2 on conflicts," "never VERIFY twice in a row". These are expected to
   eliminate most of the thrashing.
 
 ## How to run it

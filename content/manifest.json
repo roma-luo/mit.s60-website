@@ -10,7 +10,7 @@
     {
       "id": "about",
       "label": "ABOUT",
-      "title": "About — what this site is",
+      "title": "About: what this site is",
       "section": "meta",
       "tags": [
         "about",
@@ -54,7 +54,7 @@
     {
       "id": "fp-1",
       "label": "FINAL IDEA 01",
-      "title": "Idea 1 — Hippocampus+",
+      "title": "Idea 1: Hippocampus+",
       "section": "final project",
       "tags": [
         "final",
@@ -88,7 +88,7 @@
     {
       "id": "fp-2",
       "label": "FINAL IDEA 02",
-      "title": "Idea 2 — The Debater",
+      "title": "Idea 2: The Debater",
       "section": "final project",
       "tags": [
         "final",
@@ -123,7 +123,7 @@
     {
       "id": "fp-3",
       "label": "FINAL IDEA 03",
-      "title": "Idea 3 — Wormhole",
+      "title": "Idea 3: Wormhole",
       "section": "final project",
       "tags": [
         "final",
@@ -157,7 +157,7 @@
     {
       "id": "self",
       "label": "SELF",
-      "title": "Who I am — Roma Luo",
+      "title": "Who I am: Roma Luo",
       "section": "meta",
       "tags": [
         "roma",
@@ -187,7 +187,7 @@
     {
       "id": "week1-overview",
       "label": "WEEK 01 OVERVIEW",
-      "title": "Week 1 Agent Overview — the Downloads-folder naming agent",
+      "title": "Week 1 Agent Overview: the Downloads-folder naming agent",
       "section": "week 1",
       "tags": [
         "week1",
@@ -216,7 +216,7 @@
     {
       "id": "week1-compliance",
       "label": "WEEK 01 COMPLIANCE",
-      "title": "Week 1 Compliance Report — requirements, module by module",
+      "title": "Week 1 Compliance Report: requirements, module by module",
       "section": "week 1",
       "tags": [
         "week1",
@@ -239,7 +239,7 @@
     {
       "id": "week2-calendar",
       "label": "WEEK 02 BUILD",
-      "title": "Week 2 Weekly Build — Calendar++",
+      "title": "Week 2 Weekly Build: Calendar++",
       "section": "week 2",
       "tags": [
         "week2",
@@ -276,7 +276,7 @@
     {
       "id": "week2-tech",
       "label": "WEEK 02 TECH",
-      "title": "Week 2 Build Notes — Calendar++ architecture and tools",
+      "title": "Week 2 Build Notes: Calendar++ architecture and tools",
       "section": "week 2",
       "tags": [
         "week2",
@@ -316,7 +316,7 @@
     {
       "id": "week3-build",
       "label": "WEEK 03 BUILD",
-      "title": "Week 3 Weekly Build — Frontier Map",
+      "title": "Week 3 Weekly Build: Frontier Map",
       "section": "week 3",
       "tags": [
         "week3",
@@ -360,7 +360,7 @@
     {
       "id": "week3-research",
       "label": "WEEK 03 RESEARCH",
-      "title": "Week 3 Research — calibrating human judgment of AI capability",
+      "title": "Week 3 Research: calibrating human judgment of AI capability",
       "section": "week 3",
       "tags": [
         "week3",
@@ -397,7 +397,7 @@
     {
       "id": "week3-perspective",
       "label": "WEEK 03 PERSPECTIVE",
-      "title": "Week 3 Perspective — cognition moves upward",
+      "title": "Week 3 Perspective: cognition moves upward",
       "section": "week 3",
       "tags": [
         "week3",
@@ -429,7 +429,7 @@
     {
       "id": "week3-reflection",
       "label": "WEEK 03 REFLECTION",
-      "title": "Week 3 Reflection — Frontier Map",
+      "title": "Week 3 Reflection: Frontier Map",
       "section": "week 3",
       "tags": [
         "week3",

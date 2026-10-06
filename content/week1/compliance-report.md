@@ -1,7 +1,7 @@
 ---
 id: week1-compliance
 label: WEEK 01 COMPLIANCE
-title: Week 1 Compliance Report — requirements, module by module
+title: Week 1 Compliance Report: requirements, module by module
 section: week 1
 answer: The compliance report for the week one agent: each assignment requirement mapped to the module that satisfies it, from observations and actions to stopping conditions, the local model, and the hand-written loop. It ends with the outstanding items before submission.
 tags: [week1, compliance, requirements, agent, loop, documentation]
@@ -50,7 +50,7 @@ Three further modules do not map onto a single requirement but determine the age
 | `list_similar(TYPE)` | files already named under that TYPE, so the agent can keep its style consistent |
 | `verify()` | what every file is actually called right now |
 
-**How observations reach the model**: `prompt_block(env)` in `prompts.py` attaches only two things each turn — the available action list and a count of files still needing a name. The file listing is not attached automatically; the agent has to call `LIST` itself. This is deliberate. It is the only way the trace can show whether the agent remembers what it has already done.
+**How observations reach the model**: `prompt_block(env)` in `prompts.py` attaches only two things each turn: the available action list and a count of files still needing a name. The file listing is not attached automatically; the agent has to call `LIST` itself. This is deliberate. It is the only way the trace can show whether the agent remembers what it has already done.
 
 **Correspondence with the tutorial**: `peek()` is this environment's `CHECK_TRAY`. The filename is the label; the content is the tray.
 
@@ -67,7 +67,7 @@ READ_CONVENTIONS | LIST | PEEK <file> | LIST_SIMILAR <TYPE> |
 RENAME <file> <new_name> | VERIFY | DEFER <file> <reason> | DONE
 ```
 
-**Selection**: the model's reply is fixed at two lines — one sentence of reasoning, then `ACTION: <action>`. `loop.py` takes the **first** match of `ACTION:\s*(.+)`. First rather than last, because the model sometimes plans two steps in one reply; running the first and re-prompting keeps them in order. This follows the tutorial's `parse_action`.
+**Selection**: the model's reply is fixed at two lines: one sentence of reasoning, then `ACTION: <action>`. `loop.py` takes the **first** match of `ACTION:\s*(.+)`. First rather than last, because the model sometimes plans two steps in one reply; running the first and re-prompting keeps them in order. This follows the tutorial's `parse_action`.
 
 **Execution**: `execute(env, action)` in `actions.py` is a plain chain of ifs mapping each action name onto a method of `DownloadsFolder`. Filenames may contain spaces, so `RENAME` takes its last token as the new name and `DEFER` matches the file by longest known-name prefix.
 
@@ -97,7 +97,7 @@ The only way for the agent to learn whether a rename took effect is `VERIFY`. Th
 
 The design is not an artificial obstacle. Windows filenames are case-insensitive, and `os.rename` will silently overwrite a target that differs only in case. The agent runs into this for real.
 
-**Visible in the trace**: in a typical run the agent calls `VERIFY`, discovers that an earlier `RENAME` never took effect, and goes back to fix it. The input to that correction is precisely the output of the preceding `VERIFY` — the requirement, literally.
+**Visible in the trace**: in a typical run the agent calls `VERIFY`, discovers that an earlier `RENAME` never took effect, and goes back to fix it. The input to that correction is precisely the output of the preceding `VERIFY`. That is the requirement, literally.
 
 ---
 
@@ -109,9 +109,9 @@ Both stopping points live in `loop.py`.
 
 **Finished**: the model emits `DONE` (anything starting with `DONE`, so `DONE.` and similar variants count). `check(env)` in `validate.py` then runs three independent tests:
 
-1. `_check_untouched` — no file still carries its original name unless it was deferred
-2. `_check_conflicts` — no two files want the same name (compared case-insensitively)
-3. `_check_names` — every new name matches the format pattern, its TYPE is in the vocabulary, it contains no illegal characters, and it is not a Windows reserved name
+1. `_check_untouched`: no file still carries its original name unless it was deferred
+2. `_check_conflicts`: no two files want the same name (compared case-insensitively)
+3. `_check_names`: every new name matches the format pattern, its TYPE is in the vocabulary, it contains no illegal characters, and it is not a Windows reserved name
 
 All three must pass. Otherwise `DONE rejected: <specific reasons>` becomes the next observation and the loop continues.
 

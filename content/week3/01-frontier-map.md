@@ -1,7 +1,7 @@
 ---
 id: week3-build
 label: WEEK 03 BUILD
-title: Week 3 Weekly Build — Frontier Map
+title: Week 3 Weekly Build: Frontier Map
 section: week 3
 answer: My week three build, Frontier Map: a calm desktop dial that trains one skill, judging what AI can and cannot do. Before each task I hand to Claude, I predict with one click how well it will go; an observer agent counts my corrections, and a radial dot map shows where I overestimate or underestimate Claude.
 tags: [week3, build, frontier map, calibration, metacognition, delegation, dial, smolagents, agents]
@@ -54,7 +54,7 @@ A frameless, transparent, always-on-top **dial** at the right edge of the primar
 small dark disc whose dots summarize the user's map. Interaction is visual plus a single mouse click.
 There is no chat window and no typing.
 
-### Human–technology relations
+### Human-technology relations
 | State | Relation | Why |
 |---|---|---|
 | Idle, observing | Background | The dial stays at the periphery and records quietly |
@@ -84,7 +84,7 @@ Predictions are mandatory: overconfidence on tasks that look easy is the most in
 | Corrections after the task | Outcome |
 |---|---|
 | none | First pass |
-| 1–2 | After revision |
+| 1 or 2 | After revision |
 | 3 or more | Failed |
 
 A manual takeover marked during review counts as *After revision* (minor edits) or *Failed* (major
@@ -92,7 +92,7 @@ rewrite). An explicit override by the user wins over both.
 
 ---
 
-## 3. Human–agent interaction specification
+## 3. Human-agent interaction specification
 
 | Component | Specification |
 |---|---|

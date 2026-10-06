@@ -1,7 +1,7 @@
-/* Brain — static, client-side brain: the no-API fallback.
+/* Brain: static, client-side brain: the no-API fallback.
  * Works on any static host with no backend. Three canned intents
  * (greeting / show-everything / not-found) + keyword search over the
- * manifest; per-topic regex rules are gone on purpose — memories grow,
+ * manifest; per-topic regex rules are gone on purpose: memories grow,
  * rules don't scale, and the API path answers those queries anyway.
  *
  *   await Brain.answer(query) → { text, docIds: string[] }

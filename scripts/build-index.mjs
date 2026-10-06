@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-/* build-index.mjs — build artifacts for the memory vault:
- *   content/manifest.json  — entries generated from .md front matter
- *   content/index.json     — chunks (+ vectors when OPENAI_API_KEY is set)
+/* build-index.mjs: build artifacts for the memory vault:
+ *   content/manifest.json: entries generated from .md front matter
+ *   content/index.json: chunks (+ vectors when OPENAI_API_KEY is set)
  *                            + tf/df for BM25, for /api/recall hybrid search
  *
  * Incremental: a chunk is re-embedded only when its sha1 changes
  * (content/.embed-cache.json). Without OPENAI_API_KEY the script still
- * emits everything except vectors (BM25-only index) with a warning —
+ * emits everything except vectors (BM25-only index) with a warning:
  * Vercel supplies the key at build time.
  *
  * Zero dependencies by design: the front-matter parser is hand-rolled
@@ -49,9 +49,9 @@ export function parseFrontMatter(src) {
   return { data, body: src.slice(m[0].length) };
 }
 
-// label fallback: title before "—", uppercased, trailing number zero-padded
+// label fallback: title before ":" (or an old em dash), uppercased, trailing number zero-padded
 export function deriveLabel(title) {
-  const base = (String(title).split('—')[0] || title).trim().toUpperCase();
+  const base = (String(title).split(/[:\u2014]/)[0] || title).trim().toUpperCase();
   return base.replace(/(\d+)\s*$/, n => n.padStart(2, '0'));
 }
 
@@ -181,7 +181,7 @@ async function main() {
   if (!stale.length) {
     console.log('embeddings: all chunks cached, nothing to do');
   } else if (!key) {
-    console.warn(`WARNING: OPENAI_API_KEY not set — building BM25-only index (${stale.length} chunks un-embedded). Set it and re-run to add vectors.`);
+    console.warn(`WARNING: OPENAI_API_KEY not set: building BM25-only index (${stale.length} chunks un-embedded). Set it and re-run to add vectors.`);
   } else {
     try {
       console.log(`embedding via ${new URL(embeddingsUrl()).host} model ${embedModel()}`);
@@ -194,7 +194,7 @@ async function main() {
       }
     } catch (err) {
       // a bad key / quota / network must never break the build
-      console.warn(`WARNING: embedding failed (${err.message}) — continuing BM25-only.`);
+      console.warn(`WARNING: embedding failed (${err.message}): continuing BM25-only.`);
     }
   }
 

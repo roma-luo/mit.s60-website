@@ -1,10 +1,10 @@
-/* Face — procedural 2D canvas face (fallback renderer).
+/* Face: procedural 2D canvas face (fallback renderer).
  *
  * Public API (swap point for a future 3D / video renderer):
  *   Face.init(canvasElement)
- *   Face.setState(mode)   — 'idle' | 'listening' | 'thinking' | 'speaking' | 'showing'
- *   Face.setMouth(v)      — mouth openness 0..1, driven by Voice while speaking
- *   Face.lookAt(x, y)     — gaze direction, each in -1..1
+ *   Face.setState(mode): 'idle' | 'listening' | 'thinking' | 'speaking' | 'showing'
+ *   Face.setMouth(v): mouth openness 0..1, driven by Voice while speaking
+ *   Face.lookAt(x, y): gaze direction, each in -1..1
  */
 var Face = (() => {
   let canvas, ctx, W, H, rafId = null;

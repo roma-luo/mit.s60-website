@@ -1,9 +1,9 @@
-/* main — boot and UI wiring for the node-board layout.
+/* main: boot and UI wiring for the node-board layout.
  * Exposes the UI object used by Agent:
- *   UI.setState(st)              — LED states, wire flow, running-module rim
- *   UI.setAnswer(res, opts)      — fill the OUTPUT well (+ typewriter reveal)
+ *   UI.setState(st): LED states, wire flow, running-module rim
+ *   UI.setAnswer(res, opts): fill the OUTPUT well (+ typewriter reveal)
  *   UI.spawnChildren(entries, round) / UI.cancelSpawn() / UI.collapseChildren()
- *   UI.setMode(mode)             — INPUT meta Mode row
+ *   UI.setMode(mode): INPUT meta Mode row
  *   UI.showIndex() / UI.hideIndex()
  * The three windows (INPUT / SELF / OUTPUT) and every spawned child are free
  * bodies on the board; js/canvas.js owns dragging, zoom, pan and wires.
@@ -52,7 +52,7 @@ const UI = (() => {
     return row;
   }
 
-  /* URL of a memory document itself — used as Markdown baseUrl so relative
+  /* URL of a memory document itself: used as Markdown baseUrl so relative
    * images/links inside the doc resolve correctly from any subpath. */
   function docBaseUrl(entry) {
     return new URL(entry.file, document.baseURI).href;
@@ -81,11 +81,11 @@ const UI = (() => {
     try {
       const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
       const lm = r.headers.get('Last-Modified');
-      if (!lm) return '—';
+      if (!lm) return 'unknown';
       const d = new Date(lm);
       const pad = n => String(n).padStart(2, '0');
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    } catch (e) { return '—'; }
+    } catch (e) { return 'unknown'; }
   }
 
   async function buildSelfMeta() {
@@ -172,7 +172,7 @@ const UI = (() => {
 
     btn.addEventListener('click', async () => {
       if (!open && onOpen) await onOpen();
-      // offsetHeight / clientWidth are layout px — unaffected by zoom or lean
+      // offsetHeight / clientWidth are layout px: unaffected by zoom or lean
       const from = well.offsetHeight;
       open = !open;
       const to = open ? text.scrollHeight : well.clientWidth * 3 / 4;
@@ -393,7 +393,7 @@ const UI = (() => {
   const delay = ms => new Promise(r => setTimeout(r, ms));
 
   // §spawn layout: one chain, never a fan. Cards run left → right in
-  // reading order — OUTPUT → doc → its attachments → next doc → … — and each
+  // reading order: OUTPUT → doc → its attachments → next doc → …: and each
   // card is wired only from the one before it, so every window has exactly
   // one wire in and one wire out (a proposal leads straight into its image).
   // The chain is loose on purpose: each round draws fresh gaps and heights
@@ -440,7 +440,7 @@ const UI = (() => {
     spawnRound = round;
     const alive = () => myGen === spawnGen && (round === undefined || round === spawnRound);
 
-    // every child on the board — attachment windows have no expander, so
+    // every child on the board: attachment windows have no expander, so
     // collecting from `expanders` alone left them (and their wires) behind
     const old = [...document.querySelectorAll('#canvas > .child')];
     if (old.length) {
@@ -511,7 +511,7 @@ const UI = (() => {
    * right edge. Groups come from the manifest, so a new week appears on its
    * own: each "week N" section is one button (in week order), other
    * sections one button each, and "meta" splits into its memories (about,
-   * ai disclosure, self — labelled by their own short label). */
+   * ai disclosure, self: labelled by their own short label). */
   function memoryGroups() {
     const bySection = new Map();
     for (const e of Memory.entries) {
@@ -662,7 +662,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     await Memory.load();
   } catch (err) {
     console.error(err);
-    outputText.innerHTML = '<p class="placeholder">my memory failed to load — serve this folder over http (see README)</p>';
+    outputText.innerHTML = '<p class="placeholder">my memory failed to load. Serve this folder over http (see README)</p>';
     return;
   }
 

@@ -14,7 +14,7 @@
   html[data-boot=off] #boot{display:none!important}
 </style>
 <script>
-  /* boot v2 suppression check — runs before first paint: plays on every
+  /* boot v2 suppression check: runs before first paint: plays on every
      page load, skipped only under ?brain=static */
   if (/(?:\?|&)brain=static\b/.test(location.search)) {
     document.documentElement.dataset.boot = 'off';

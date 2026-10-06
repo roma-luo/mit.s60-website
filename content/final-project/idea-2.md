@@ -1,7 +1,7 @@
 ---
 id: fp-2
 label: FINAL IDEA 02
-title: Idea 2 — The Debater
+title: Idea 2: The Debater
 section: final project
 answer: Idea two: The Debater. A module that triggers on high-certainty words, irreversible decisions, and conflicts with your recorded history, then plays a person whose opposing view you respect and generates the strongest counterargument. It holds no position of its own.
 tags: [final, project, idea, proposal, braindance, expertise, memory, learning]

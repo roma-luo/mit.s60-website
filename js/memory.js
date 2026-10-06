@@ -1,13 +1,13 @@
-/* Memory — the agent's memory vault: manifest registry + document fetch
+/* Memory: the agent's memory vault: manifest registry + document fetch
  * + keyword search. Display is owned by UI (main.js).
  *
- *   await Memory.load()          — fetch content/manifest.json
- *   Memory.search(query)         — scored entries, best first: [{entry, score}]
+ *   await Memory.load(): fetch content/manifest.json
+ *   Memory.search(query): scored entries, best first: [{entry, score}]
  *   Memory.byId(id)
- *   Memory.label(entry)        — display label ("WEEK 01"), entry.label or derived
- *   await Memory.fetchDoc(entry) — markdown source (cached)
- *   await Memory.excerpt(entry)  — first plain paragraph, ≤220 chars
- *   await Memory.firstImage(entry) — first ![..](src) of the doc, resolved
+ *   Memory.label(entry): display label ("WEEK 01"), entry.label or derived
+ *   await Memory.fetchDoc(entry): markdown source (cached)
+ *   await Memory.excerpt(entry): first plain paragraph, ≤220 chars
+ *   await Memory.firstImage(entry): first ![..](src) of the doc, resolved
  *                                    against the doc's own URL (or null)
  */
 const Memory = (() => {
@@ -33,11 +33,11 @@ const Memory = (() => {
   }
 
   // display label for child-node titles: entry.label when present, else the
-  // title part before "—", uppercased, trailing number zero-padded ("Week 1"
-  // → "WEEK 01") — new memories work without an explicit label
+  // title part before ":" (or an old em dash), uppercased, trailing number zero-padded ("Week 1"
+  // → "WEEK 01"): new memories work without an explicit label
   function label(entry) {
     if (entry.label) return entry.label;
-    const base = (entry.title.split('—')[0] || entry.title).trim().toUpperCase();
+    const base = (entry.title.split(/[:\u2014]/)[0] || entry.title).trim().toUpperCase();
     return base.replace(/(\d+)\s*$/, m => m.padStart(2, '0'));
   }
 

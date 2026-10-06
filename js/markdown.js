@@ -1,4 +1,4 @@
-/* Markdown — minimal md → html, zero dependencies.
+/* Markdown: minimal md → html, zero dependencies.
  * Supports: #-###### headings, **bold**, *italic*, `code`, ``` fenced blocks,
  * - lists, 1. lists, [links](url), ![images](src), | tables |, > blockquotes,
  * --- hr, paragraphs (consecutive plain lines merge into one <p>).

@@ -1,13 +1,13 @@
-/* Agent — conversation state machine.
+/* Agent: conversation state machine.
  * idle → listening → thinking → speaking → (showing) → idle
  *
- *   Agent.handle(query)    — a new query interrupts the current round:
+ *   Agent.handle(query): a new query interrupts the current round:
  *                            speech stops, pending child spawns are
  *                            cancelled (UI.cancelSpawn), the round starts now.
- *   Agent.cancel()         — Esc: stop speech + spawning, fold expanded
+ *   Agent.cancel(): Esc: stop speech + spawning, fold expanded
  *                            children back to preview, back to idle.
- *   Agent.setState(st)     — drives Face and UI together.
- *   Agent.showEntry(entry) — index card: OUTPUT + one child node, no speech.
+ *   Agent.setState(st): drives Face and UI together.
+ *   Agent.showEntry(entry): index card: OUTPUT + one child node, no speech.
  * Answers carry docIds[]; each becomes a child node on the canvas.
  * voice.js carries a watchdog for browsers that never fire SpeechSynthesis
  * onend, so a round can never wedge mid-speech.
@@ -42,7 +42,7 @@ const Agent = (() => {
     query = (query || '').trim();
     if (!query) return;
 
-    interrupt(); // interrupt-priority — never silently drop a new query
+    interrupt(); // interrupt-priority: never silently drop a new query
     if (query === '/index') { UI.showIndex(); return; }
 
     const myRound = round;
@@ -92,7 +92,7 @@ const Agent = (() => {
     setState(entries.length ? 'showing' : 'idle');
   }
 
-  // index card picked — OUTPUT shows the answer, one child node appears
+  // index card picked: OUTPUT shows the answer, one child node appears
   // next to it; no brain, no speech
   async function showEntry(entry) {
     interrupt();
@@ -102,7 +102,7 @@ const Agent = (() => {
     setState('showing');
   }
 
-  // memory-bar button picked — a group of memories (a week, the final
+  // memory-bar button picked: a group of memories (a week, the final
   // project) comes out as one chain; OUTPUT lists what came out. No brain,
   // no speech.
   async function showEntries(entries, heading) {

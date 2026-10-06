@@ -1,4 +1,4 @@
-/* /api/recall — hybrid memory search for the agent loop.
+/* /api/recall: hybrid memory search for the agent loop.
  *   POST { "query": "...", "k": 6 }  →  { hits: [{ docId, heading, text, score }] }
  * Keyless path works too: no OPENAI_API_KEY → BM25-only hits. Any failure
  * returns { hits: [] } (never a 5xx) so the client falls back to keyword

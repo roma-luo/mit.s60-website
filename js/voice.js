@@ -1,7 +1,7 @@
-/* Voice — browser TTS (SpeechSynthesis) driving Face mouth, optional STT input.
+/* Voice: browser TTS (SpeechSynthesis) driving Face mouth, optional STT input.
  *
  *   Voice.speak(text, { onViseme(v), onBoundary({charIndex}), onEnd() })
- *     Long text is split into <=200-char chunks spoken in sequence — Chrome
+ *     Long text is split into <=200-char chunks spoken in sequence: Chrome
  *     desktop silently stops non-local voices mid-utterance after ~15s (B7).
  *     onBoundary reports the cumulative char index across chunks (for the
  *     typewriter reveal). A watchdog forces onEnd when the browser never
@@ -23,13 +23,13 @@ const Voice = (() => {
     const v = synth ? synth.getVoices() : [];
     if (v && v.length) voiceCache = v;
   }
-  // B8: Chrome loads voices asynchronously — cache them as soon as they arrive
+  // B8: Chrome loads voices asynchronously: cache them as soon as they arrive
   cacheVoices();
   if (synth) synth.onvoiceschanged = cacheVoices;
 
   function pickVoice() {
     const voices = voiceCache.length ? voiceCache : (synth ? synth.getVoices() : []);
-    // B6: word boundaries + exclude /female/ — "Female" contains "male"
+    // B6: word boundaries + exclude /female/: "Female" contains "male"
     return voices.find(v => /^en/i.test(v.lang) && /\b(male|david|daniel|alex|fred)\b/i.test(v.name) && !/female/i.test(v.name))
         || voices.find(v => /^en/i.test(v.lang))
         || null;

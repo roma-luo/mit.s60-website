@@ -1,4 +1,4 @@
-/* ApiBrain — cloud live mode: the AgentLoop with DeepSeek as the model
+/* ApiBrain: cloud live mode: the AgentLoop with DeepSeek as the model
  * (via /api/chat) and /api/recall (hybrid vector + BM25 search over the
  * build-time index) for retrieval. Falls back to Brain (static) on failure.
  *
@@ -16,7 +16,7 @@ const ApiBrain = (() => {
   const enabled = brainParam !== 'static';
 
   // a 404/405 from the proxy means this host has no backend at all (e.g.
-  // GitHub Pages) — after one such failure, disable for the rest of the
+  // GitHub Pages): after one such failure, disable for the rest of the
   // session instead of eating a 404 round-trip per question
   let disabled = false;
 

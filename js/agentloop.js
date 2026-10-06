@@ -1,8 +1,8 @@
-/* AgentLoop — the shared hand-written tool-calling agent loop.
+/* AgentLoop: the shared hand-written tool-calling agent loop.
  * Used by ApiBrain (cloud live mode): the brain only supplies its own
  * chat(messages) → assistant message transport. The harness carries ONLY
  * the persona; all course content lives in memory and the agent retrieves
- * it itself — via /api/recall (hybrid vector + BM25 search) when the API is
+ * it itself: via /api/recall (hybrid vector + BM25 search) when the API is
  * reachable, keyword search over the manifest when it is not.
  *
  * Tools use the model's native function calling (the schema is fixed
@@ -26,7 +26,7 @@ const AgentLoop = (() => {
       "You are Roma Luo. Not a copy, not a digital twin: you are him, on the web.",
       "The long-term memory you can recall is the ONLY thing you know about this course and your work. Answer course/work questions only from it. If something is not in memory, say you do not remember; do not improvise.",
       "Style: cold, terse, minimal. Short sentences. No warmth, no filler, no exclamation marks. Plain text only, no markdown.",
-      "Never use em dashes (the characters — or –) in your replies. Use commas, periods, or parentheses instead.",
+      "Never use dashes (em dash U+2014, en dash U+2013) in your replies. Use commas, periods, colons, or parentheses instead.",
       "",
       "Tools: recall(query) searches your memory; show(ids) pulls memories out for the visitor.",
       "Recall at least once before answering questions about the course.",
@@ -102,6 +102,13 @@ const AgentLoop = (() => {
     return 'Unknown tool ' + call.function.name + '. Use recall or show.';
   }
 
+  // no dashes on this site, whatever the model writes: a dash between
+  // numbers becomes "to", any other becomes a comma
+  const undash = t => t
+    .replace(/(\d)\s*[\u2013\u2014]\s*(\d)/g, '$1 to $2')
+    .replace(/\s*[\u2013\u2014]+\s*/g, ', ')
+    .replace(/,\s*([.,;:!?])/g, '$1');
+
   // the answer must fit the OUTPUT well: one rewrite request if it runs
   // long, then a hard trim at the last whole sentence (never mid-sentence)
   async function fit(text, messages, chat) {
@@ -130,7 +137,7 @@ const AgentLoop = (() => {
       const calls = msg.tool_calls || [];
       const text = (msg.content || '').trim();
       if (!calls.length) {
-        if (text && !LEAK.test(text)) return { text: await fit(text, messages, chat), docIds: [...docIds] };
+        if (text && !LEAK.test(text)) return { text: undash(await fit(text, messages, chat)), docIds: [...docIds] };
         // leaked tool markup (or nothing): don't show it, ask again
         messages.push({ role: 'assistant', content: text || '(empty)' });
         messages.push({ role: 'user', content: 'Use the tools API for tool calls, never text markup. If you are done, answer the visitor in plain text.' });
