@@ -398,13 +398,10 @@ html, body, * { scrollbar-width: none; }
 /* document window: the whole of a memory too long for any card, set
    small and dense, read like a printed sheet */
 .node--doc { width: 460px; }   /* sizeDoc sets the real width */
-.node--doc .node__body { padding: 12px 12px 10px; }
-.doc__date { color: var(--fg-3); font-size: 9px; letter-spacing: 0.04em; min-height: 1em; }
-.doc__title { color: var(--fg); font-size: 19px; font-weight: 500; line-height: 1.15; margin: 6px 0 10px; }
+.node--doc .node__body { padding: 14px; }
 .doc__text { color: var(--well-fg); font-size: 7.5px; line-height: 1.38; overflow-wrap: anywhere; column-gap: 16px; column-rule: 1px solid rgba(255,255,255,0.06); }
 .doc__text > * { break-inside: avoid-column; }
 .doc__text > p, .doc__text > ul, .doc__text > ol { break-inside: auto; }
-.doc__text h1 { display: none; }   /* the title above already says it */
 .doc__text h2, .doc__text h3, .doc__text h4 { color: var(--fg); font-size: 1.15em; font-weight: 600; margin: 0.9em 0 0.3em; }
 .doc__text p + p, .doc__text p + ul, .doc__text ul + p, .doc__text p + ol { margin-top: 0.5em; }
 .doc__text ul, .doc__text ol { margin: 0.4em 0; padding-left: 1.2em; }

@@ -292,8 +292,10 @@ const UI = (() => {
     if (fits()) card.classList.replace('node--long', 'node--short');
   }
 
-  // §doc window: a memory too long for any card gets one tall window of
-  // small, dense text (the whole document), wired from its card
+  // §doc window: a memory too long for any card gets one window of small,
+  // dense text: the body of the document and nothing else (no title bar,
+  // no date, no heading, no meta rows). With no meta rows its wire meets
+  // the window's edge centre; it leaves with its card.
   function buildDocWindow(card) {
     const entry = Memory.byId(card.dataset.id);
     const win = document.createElement('section');
@@ -302,47 +304,16 @@ const UI = (() => {
     win.dataset.id = entry.id + '#doc';
     win.dataset.doc = '1';
     win.dataset.parent = card.id;
-
-    const head = document.createElement('header');
-    head.className = 'node__head';
-    const label = document.createElement('span');
-    label.className = 'node__label';
-    label.textContent = LABELS.child(entry) + ' · document';
-    const close = document.createElement('button');
-    close.className = 'node__close';
-    close.setAttribute('aria-label', 'dismiss');
-    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(win); });
-    head.appendChild(label);
-    head.appendChild(close);
+    win.setAttribute('aria-label', entry.title);
 
     const body = document.createElement('div');
     body.className = 'node__body';
-    const date = document.createElement('div');
-    date.className = 'doc__date';
-    lastModified(new URL(entry.file, document.baseURI).href).then(t => { date.textContent = t; });
-    const title = document.createElement('h3');
-    title.className = 'doc__title';
-    title.textContent = entry.title;
     const text = document.createElement('div');
     text.className = 'doc__text';
     text.innerHTML = card.docHtml;
-    text.querySelectorAll('img').forEach(img => img.remove());  // pictures have their own windows
-    body.appendChild(date);
-    body.appendChild(title);
+    text.querySelectorAll('h1, img').forEach(el => el.remove());  // the card names it; pictures have their own windows
     body.appendChild(text);
-
-    const words = (text.textContent.match(/\S+/g) || []).length;
-    const meta = document.createElement('footer');
-    meta.className = 'node__meta';
-    const rows = document.createElement('div');
-    rows.className = 'meta-rows';
-    rows.appendChild(metaRow('Artifact', entry.title));
-    rows.appendChild(metaRow('Type', 'text / document · ' + words + ' words'));
-    meta.appendChild(rows);
-
-    win.appendChild(head);
     win.appendChild(body);
-    win.appendChild(meta);
     return win;
   }
 
