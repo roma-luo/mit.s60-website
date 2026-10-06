@@ -183,6 +183,8 @@ html, body, * { scrollbar-width: none; }
   font-size: var(--fs-body);
   line-height: 1.6;
 }
+/* meta rows read all lowercase, keys and values alike */
+.meta-row { text-transform: lowercase; }
 .meta-row span { color: var(--fg-3); margin-right: .4em; }
 .meta-row b { color: var(--label-color); font-weight: var(--fw); }
 
