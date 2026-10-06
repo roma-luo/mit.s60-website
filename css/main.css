@@ -381,10 +381,19 @@ html, body, * { scrollbar-width: none; }
   transition: opacity 240ms ease;
 }
 .well.is-open::after { opacity: 0; }
-.well.is-open { transition: height 420ms cubic-bezier(0.2, 0, 0, 1); }
+/* both ways: the collapse needs its transitionend too */
+.well { transition: height 420ms cubic-bezier(0.2, 0, 0, 1); }
 /* long text that fits its well shows whole: no fade, no expand button */
 .node--long.is-fit .well::after { display: none; }
 .node--long.is-fit .node__more { display: none; }
+
+/* memory cards carry both forms of their key content: the well (long
+   window) or the face text (short window), picked by fitShort. Expand stays:
+   it opens the full document. */
+.child.node--long .short__text { display: none; }
+.child.node--short .well { display: none; }
+.child.is-measuring .short__text { display: block; }
+.child.is-fit .node__more { display: inline-flex; }
 
 /* short text: no well, the content sits on the face */
 .node--short .node__body { padding: 14px 10px 8px; }

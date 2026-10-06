@@ -151,7 +151,8 @@ const UI = (() => {
   }
 
   /* ---- long-text wells: expand / collapse (R5 fit rule, R7 pin-px) */
-  function initWellExpand(card, onFirstExpand) {
+  // onOpen runs before every expand, onClosed after every collapse settles
+  function initWellExpand(card, onOpen, onClosed) {
     const btn = card.querySelector('.node__more');
     const well = card.querySelector('.well');
     const text = card.querySelector('.well__text');
@@ -170,7 +171,7 @@ const UI = (() => {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
 
     btn.addEventListener('click', async () => {
-      if (!open && onFirstExpand) await onFirstExpand();
+      if (!open && onOpen) await onOpen();
       // offsetHeight / clientWidth are layout px — unaffected by zoom or lean
       const from = well.offsetHeight;
       open = !open;
@@ -184,12 +185,21 @@ const UI = (() => {
       label.textContent = open ? 'collapse' : 'expand';
       well.style.height = to + 'px';
       if (typeof Canvas !== 'undefined') Canvas.reflow(480); // 420ms + a frame or two
+      // reduced motion has no transition, so no transitionend: settle anyway
+      clearTimeout(settleTimer);
+      if (!open) settleTimer = setTimeout(settle, 520);
     });
-    well.addEventListener('transitionend', e => {
-      if (e.propertyName !== 'height' || open) return;
+    let settleTimer = null;
+    const settle = () => {
+      clearTimeout(settleTimer);
+      if (open || !well.style.height) return;
       well.style.aspectRatio = '4 / 3';        // hand the box back to the ratio
       well.style.height = '';
+      if (onClosed) onClosed();
       measure();
+    };
+    well.addEventListener('transitionend', e => {
+      if (e.propertyName === 'height') settle();
     });
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(measure).observe(text);
 
@@ -221,19 +231,21 @@ const UI = (() => {
     well.className = 'well';
     const wellText = document.createElement('div');
     wellText.className = 'well__text';
-    const p = document.createElement('p');
-    p.textContent = 'recalling…';
-    wellText.appendChild(p);
+    // the card shows the memory's key content (its `answer`); the document
+    // itself only comes in on expand. Collapsed, the key content is back.
+    const showKey = () => {
+      const p = document.createElement('p');
+      p.textContent = entry.answer;
+      wellText.replaceChildren(p);
+    };
+    showKey();
     well.appendChild(wellText);
     body.appendChild(well);
-    // the whole document goes in the well (the fade + expand show the rest);
-    // spawnChildren waits for it, then fitShort decides the window kind
-    card.mediaReady = Memory.fetchDoc(entry).then(md => {
-      wellText.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
-    }, () => {
-      wellText.innerHTML = '<p>(this memory could not be loaded)</p>';
-      card.dataset.failed = '1';
-    });
+    // short form of the same key content (fitShort decides which one shows)
+    const brief = document.createElement('p');
+    brief.className = 'short__text';
+    brief.textContent = entry.answer;
+    body.appendChild(brief);
 
     const meta = document.createElement('footer');
     meta.className = 'node__meta';
@@ -253,73 +265,41 @@ const UI = (() => {
     card.appendChild(body);
     card.appendChild(meta);
 
-    expanders.set(card, initWellExpand(card));
+    // expand: a short card opens up as a long one, and the well fills with
+    // the whole document; collapse returns to the key content and, for a
+    // short card, to the short window
+    const setShort = on => {
+      card.classList.toggle('node--short', on);
+      card.classList.toggle('node--long', !on);
+    };
+    expanders.set(card, initWellExpand(card, async () => {
+      if (card.dataset.brief) setShort(false);
+      try {
+        const md = await Memory.fetchDoc(entry);
+        wellText.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
+      } catch (err) {
+        wellText.innerHTML = '<p>(this memory could not be loaded)</p>';
+      }
+    }, () => {
+      showKey();
+      if (card.dataset.brief) { setShort(true); Canvas.reflow(100); }
+    }));
     return card;
   }
 
-  // the filter between the two window kinds: a mounted long card whose whole
-  // document, set at short-text size, is no taller than the well becomes a
-  // short card (text on the face, no well, no expand); anything longer stays
-  // long. Measured, not counted: headings, lists and images all take room.
+  // the filter between the two window kinds: measured on the mounted card,
+  // the key content goes in the short window (text on the face) when it is
+  // no taller there than the long window's well; longer key content stays in
+  // the long window. Both keep expand for the full document.
   function fitShort(card) {
-    if (!card.classList.contains('node--long') || card.dataset.failed) return;
-    const well = card.querySelector('.well');
-    const doc = document.createElement('div');
-    doc.className = 'short__text short__doc';
-    doc.innerHTML = card.querySelector('.well__text').innerHTML;
-    const body = card.querySelector('.node__body');
-    const room = well.clientHeight;
-    body.appendChild(doc);
-    if (doc.offsetHeight > room) { doc.remove(); expanders.get(card)?.measure(); return; }
-    well.remove();
-    card.querySelector('.node__more')?.remove();
+    if (!card.classList.contains('node--long') || !card.querySelector('.short__text')) return;
+    const room = card.querySelector('.well').clientHeight;
+    card.classList.add('is-measuring');
+    const need = card.querySelector('.short__text').offsetHeight;
+    card.classList.remove('is-measuring');
+    if (need > room) return;
+    card.dataset.brief = '1';
     card.classList.replace('node--long', 'node--short');
-    card.classList.remove('is-fit');
-    expanders.delete(card);
-  }
-
-  // proposals are short text: no well, no expand — the one-paragraph answer
-  // sits on the face (the INPUT window's design), wired straight to its image
-  const SHORT_SECTIONS = new Set(['final project']);
-  const isShort = entry => SHORT_SECTIONS.has(entry.section);
-
-  function buildShortChild(entry) {
-    const card = document.createElement('section');
-    card.className = 'node node--short child';
-    card.id = 'c-' + entry.id;
-    card.dataset.id = entry.id;
-
-    const head = document.createElement('header');
-    head.className = 'node__head';
-    const label = document.createElement('span');
-    label.className = 'node__label';
-    label.textContent = LABELS.child(entry);
-    const close = document.createElement('button');
-    close.className = 'node__close';
-    close.setAttribute('aria-label', 'dismiss');
-    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(card); });
-    head.appendChild(label);
-    head.appendChild(close);
-
-    const body = document.createElement('div');
-    body.className = 'node__body';
-    const p = document.createElement('p');
-    p.className = 'short__text';
-    p.textContent = entry.answer;
-    body.appendChild(p);
-
-    const meta = document.createElement('footer');
-    meta.className = 'node__meta';
-    const rows = document.createElement('div');
-    rows.className = 'meta-rows';
-    rows.appendChild(metaRow('Artifact', entry.title));
-    rows.appendChild(metaRow('Type', 'text / proposal'));
-    meta.appendChild(rows);
-
-    card.appendChild(head);
-    card.appendChild(body);
-    card.appendChild(meta);
-    return card;
   }
 
   // one small media window per attachment, spawned right after its parent doc
@@ -471,7 +451,7 @@ const UI = (() => {
     if (!alive()) return;
 
     const all = entries.flatMap(entry => [
-      isShort(entry) ? buildShortChild(entry) : buildChild(entry),
+      buildChild(entry),
       ...(entry.attachments || []).map(att => buildAttachmentChild(entry, att))
     ]);
     all.forEach((card, i) => { card.dataset.parent = i ? all[i - 1].id : 'node-output'; });
