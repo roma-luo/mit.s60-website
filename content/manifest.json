@@ -312,6 +312,147 @@
       "attachments": [
         "calendarpp-diagram.jpg"
       ]
+    },
+    {
+      "id": "week3-build",
+      "label": "WEEK 03 BUILD",
+      "title": "Week 3 Weekly Build — Frontier Map",
+      "section": "week 3",
+      "tags": [
+        "week3",
+        "build",
+        "frontier map",
+        "calibration",
+        "metacognition",
+        "delegation",
+        "dial",
+        "smolagents",
+        "agents"
+      ],
+      "keywords": [
+        "week 3",
+        "week three",
+        "third week",
+        "weekly build",
+        "frontier map",
+        "dial",
+        "prediction",
+        "calibration",
+        "brier score",
+        "overestimation",
+        "review panel",
+        "radial map",
+        "demo",
+        "demo video",
+        "architecture",
+        "state machine",
+        "interface"
+      ],
+      "file": "content/week3/01-frontier-map.md",
+      "answer": "My week three build, Frontier Map: a calm desktop dial that trains one skill, judging what AI can and cannot do. Before each task I hand to Claude, I predict with one click how well it will go; an observer agent counts my corrections, and a radial dot map shows where I overestimate or underestimate Claude.",
+      "attachments": [
+        "frontier-warning.jpg",
+        "frontier-review.jpg",
+        "recording-demo.mp4",
+        "frontier-architecture.jpg"
+      ]
+    },
+    {
+      "id": "week3-research",
+      "label": "WEEK 03 RESEARCH",
+      "title": "Week 3 Research — calibrating human judgment of AI capability",
+      "section": "week 3",
+      "tags": [
+        "week3",
+        "research",
+        "calibration",
+        "jagged frontier",
+        "mental models",
+        "cognition",
+        "interfaces"
+      ],
+      "keywords": [
+        "week 3",
+        "week three",
+        "research",
+        "jagged frontier",
+        "calibration",
+        "mental model",
+        "dell'acqua",
+        "bansal",
+        "bastani",
+        "cognitive debt",
+        "tools for thought",
+        "ihde",
+        "human technology relations",
+        "evidence"
+      ],
+      "file": "content/week3/02-research.md",
+      "answer": "The research behind my week three build. AI help can raise performance while eroding the skill underneath, and once execution is delegated, the critical skill becomes judging where AI succeeds and fails: the jagged frontier. Calibration is learned through explicit predictions and fast feedback, which everyday AI use never gives.",
+      "attachments": [
+        "research-frontier.jpg",
+        "research-evidence.jpg"
+      ]
+    },
+    {
+      "id": "week3-perspective",
+      "label": "WEEK 03 PERSPECTIVE",
+      "title": "Week 3 Perspective — cognition moves upward",
+      "section": "week 3",
+      "tags": [
+        "week3",
+        "perspective",
+        "cognition",
+        "delegation",
+        "design principles",
+        "mirror"
+      ],
+      "keywords": [
+        "week 3",
+        "week three",
+        "perspective",
+        "our view",
+        "my view",
+        "cognition",
+        "graph in my head",
+        "delegation",
+        "third grammar",
+        "rider and horse",
+        "mirror"
+      ],
+      "file": "content/week3/03-perspective.md",
+      "answer": "My view behind Frontier Map: delegating execution does not empty my head, it moves thinking upward, to setting goals and keeping a graph in my head of what AI can do. The interface should be light and invisible, every delegation counts, and the agent is a mirror, neither a tool nor a colleague.",
+      "attachments": [
+        "perspective-relations.jpg"
+      ]
+    },
+    {
+      "id": "week3-reflection",
+      "label": "WEEK 03 REFLECTION",
+      "title": "Week 3 Reflection — Frontier Map",
+      "section": "week 3",
+      "tags": [
+        "week3",
+        "reflection",
+        "lessons",
+        "evaluation",
+        "ai disclosure"
+      ],
+      "keywords": [
+        "week 3",
+        "week three",
+        "reflection",
+        "what worked",
+        "what struggled",
+        "lessons learned",
+        "segmentation",
+        "evaluation",
+        "real data",
+        "ai use",
+        "disclosure"
+      ],
+      "file": "content/week3/04-reflection.md",
+      "answer": "My reflection on Frontier Map. One-click prediction and history-driven warnings worked; the hold still risks reflex clicking, and task segmentation is the weakest part. Three real tasks show the loop works, not that it calibrates anyone yet. Most of the effort went into sensing, timing, focus and animation, not the LLM."
     }
   ]
 }
