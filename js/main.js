@@ -253,53 +253,97 @@ const UI = (() => {
     rows.className = 'meta-rows';
     rows.appendChild(metaRow('Artifact', entry.title));
     rows.appendChild(metaRow('Type', 'text / markdown'));
-    const more = document.createElement('button');
-    more.className = 'btn node__more';
-    more.type = 'button';
-    more.setAttribute('aria-expanded', 'false');
-    more.innerHTML = '<span class="btn__dot"></span><span class="btn__label">expand</span>';
     meta.appendChild(rows);
-    meta.appendChild(more);
 
     card.appendChild(head);
     card.appendChild(body);
     card.appendChild(meta);
 
-    // expand: a short card opens up as a long one, and the well fills with
-    // the whole document; collapse returns to the key content and, for a
-    // short card, to the short window
-    const setShort = on => {
-      card.classList.toggle('node--short', on);
-      card.classList.toggle('node--long', !on);
-    };
-    expanders.set(card, initWellExpand(card, async () => {
-      if (card.dataset.brief) setShort(false);
-      try {
-        const md = await Memory.fetchDoc(entry);
-        wellText.innerHTML = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
-      } catch (err) {
-        wellText.innerHTML = '<p>(this memory could not be loaded)</p>';
-      }
-    }, () => {
-      showKey();
-      if (card.dataset.brief) { setShort(true); Canvas.reflow(100); }
-    }));
+    // the full document, rendered once; fitShort decides where it goes
+    card.mediaReady = Memory.fetchDoc(entry).then(md => {
+      card.docHtml = Markdown.render(md, { baseUrl: docBaseUrl(entry) });
+    }, () => {});
     return card;
   }
 
-  // the filter between the two window kinds: measured on the mounted card,
-  // the key content goes in the short window (text on the face) when it is
-  // no taller there than the long window's well; longer key content stays in
-  // the long window. Both keep expand for the full document.
+  // the filter between the window kinds, measured on the mounted card:
+  // 1. the whole document fits the short window: it sits on the card, done;
+  // 2. otherwise the card carries the key content (`answer`), in the short
+  //    window when it fits there, else in the long window, and the whole
+  //    document gets its own document window (needsDoc).
   function fitShort(card) {
-    if (!card.classList.contains('node--long') || !card.querySelector('.short__text')) return;
+    const brief = card.querySelector('.short__text');
+    if (!card.classList.contains('node--long') || !brief) return;
     const room = card.querySelector('.well').clientHeight;
-    card.classList.add('is-measuring');
-    const need = card.querySelector('.short__text').offsetHeight;
-    card.classList.remove('is-measuring');
-    if (need > room) return;
-    card.dataset.brief = '1';
-    card.classList.replace('node--long', 'node--short');
+    const fits = () => {
+      card.classList.add('is-measuring');
+      const need = brief.offsetHeight;
+      card.classList.remove('is-measuring');
+      return need <= room;
+    };
+    if (card.docHtml) {
+      brief.innerHTML = card.docHtml;
+      brief.classList.add('short__doc');
+      if (fits()) { card.classList.replace('node--long', 'node--short'); return; }
+      brief.classList.remove('short__doc');
+      brief.textContent = card.querySelector('.well__text').textContent;
+      card.needsDoc = true;
+    }
+    if (fits()) card.classList.replace('node--long', 'node--short');
+  }
+
+  // §doc window: a memory too long for any card gets one tall window of
+  // small, dense text (the whole document), wired from its card
+  function buildDocWindow(card) {
+    const entry = Memory.byId(card.dataset.id);
+    const win = document.createElement('section');
+    win.className = 'node node--doc child';
+    win.id = 'd-' + entry.id;
+    win.dataset.id = entry.id + '#doc';
+    win.dataset.doc = '1';
+    win.dataset.parent = card.id;
+
+    const head = document.createElement('header');
+    head.className = 'node__head';
+    const label = document.createElement('span');
+    label.className = 'node__label';
+    label.textContent = LABELS.child(entry) + ' · document';
+    const close = document.createElement('button');
+    close.className = 'node__close';
+    close.setAttribute('aria-label', 'dismiss');
+    close.addEventListener('click', ev => { ev.stopPropagation(); dismissChild(win); });
+    head.appendChild(label);
+    head.appendChild(close);
+
+    const body = document.createElement('div');
+    body.className = 'node__body';
+    const date = document.createElement('div');
+    date.className = 'doc__date';
+    lastModified(new URL(entry.file, document.baseURI).href).then(t => { date.textContent = t; });
+    const title = document.createElement('h3');
+    title.className = 'doc__title';
+    title.textContent = entry.title;
+    const text = document.createElement('div');
+    text.className = 'doc__text';
+    text.innerHTML = card.docHtml;
+    text.querySelectorAll('img').forEach(img => img.remove());  // pictures have their own windows
+    body.appendChild(date);
+    body.appendChild(title);
+    body.appendChild(text);
+
+    const words = (text.textContent.match(/\S+/g) || []).length;
+    const meta = document.createElement('footer');
+    meta.className = 'node__meta';
+    const rows = document.createElement('div');
+    rows.className = 'meta-rows';
+    rows.appendChild(metaRow('Artifact', entry.title));
+    rows.appendChild(metaRow('Type', 'text / document · ' + words + ' words'));
+    meta.appendChild(rows);
+
+    win.appendChild(head);
+    win.appendChild(body);
+    win.appendChild(meta);
+    return win;
   }
 
   // one small media window per attachment, spawned right after its parent doc
@@ -381,6 +425,7 @@ const UI = (() => {
       if (!card.classList.contains('leaving') && parent) {
         document.querySelectorAll('.child').forEach(c => {
           if (c.dataset.parent !== card.id || c.classList.contains('leaving')) return;
+          if (c.dataset.doc) { dismissChild(c); return; }   // its document goes with it
           c.dataset.parent = parent.id;
           Canvas.addLink(parent.id, c.id);
         });
@@ -431,6 +476,46 @@ const UI = (() => {
     });
   }
 
+  // §doc layout: the document windows sit in one band under the chain, or
+  // over it, each starting just right of its card so its wire runs forward.
+  // A window takes whichever band needs the smaller shift right to clear the
+  // windows already placed there (ties go below).
+  const DOC_GAP = 90;
+  // a long document flows into columns like a printed sheet: the window
+  // keeps to about DOC_H tall and grows sideways, one DOC_COL column at a time
+  const DOC_COL = 220, DOC_COL_GAP = 16, DOC_H = 900;
+  function sizeDoc(win) {
+    const text = win.querySelector('.doc__text');
+    const pad = win.offsetWidth - text.clientWidth;
+    win.style.width = (DOC_COL + pad) + 'px';
+    const n = Math.max(1, Math.ceil(text.offsetHeight / DOC_H));
+    if (n === 1) return;
+    win.style.width = (n * DOC_COL + (n - 1) * DOC_COL_GAP + pad) + 'px';
+    text.style.columnCount = n;
+  }
+  function layoutDocs(docs, order) {
+    if (!docs.length) return [];
+    docs.forEach(sizeDoc);
+    const boxes = [...order, ...['node-input', 'node-self', 'node-output'].map(Canvas.box).filter(Boolean)];
+    const top = Math.min(...boxes.map(b => b.y)), bottom = Math.max(...boxes.map(b => b.y + b.h));
+    const bands = { below: [], above: [] };
+    return docs.map(win => {
+      const card = order.find(o => o.card.id === win.dataset.parent);
+      const w = win.offsetWidth, h = win.offsetHeight;
+      const x0 = card.x + card.w + 30;   // wire leaves the card's right edge
+      const slot = band => {
+        const b = { x: x0, y: band === 'below' ? bottom + DOC_GAP : top - DOC_GAP - h, w, h };
+        while (bands[band].some(t => hits(b, t))) b.x += 40;
+        return b;
+      };
+      const lo = slot('below'), hi = slot('above');
+      const pick = hi.x < lo.x ? 'above' : 'below';
+      const b = pick === 'above' ? hi : lo;
+      bands[pick].push(b);
+      return { card: win, x: b.x, y: b.y, w, h };
+    });
+  }
+
   // §spawn: previous round's windows fade out and leave; then the new cards
   // appear one by one (~220ms apart) along the chain, each gliding in and
   // wired to the one before. The camera glides first to OUTPUT + the whole
@@ -468,10 +553,18 @@ const UI = (() => {
     if (!alive()) { all.forEach(c => { expanders.delete(c); c.remove(); }); return; }
     all.forEach(fitShort);
     const order = layoutChain(all);
+    // documents too long for any card: one tall window each, set in a band
+    // below or above the chain so the middle row stays clear
+    const docs = all.filter(c => c.needsDoc).map(buildDocWindow);
+    for (const win of docs) {
+      win.classList.add('entering');
+      $('canvas').appendChild(win);
+    }
+    const docOrder = layoutDocs(docs, order);
     // glide the camera before the cards arrive: the whole board while the
     // visitor hasn't taken over the view, else OUTPUT + the new chain
     const keep = Canvas.touched ? ['node-output'] : ['node-input', 'node-self', 'node-output'];
-    Canvas.frameRects([...keep.map(Canvas.box), ...order], true);
+    Canvas.frameRects([...keep.map(Canvas.box), ...order, ...docOrder], true);
 
     let last = null;
     const spawnOne = ({ card, x, y }) => {
@@ -489,8 +582,14 @@ const UI = (() => {
       if (!alive()) break;
       spawnOne(p);
     }
+    for (const p of docOrder) {
+      if (!alive()) break;
+      await delay(160);
+      if (!alive()) break;
+      spawnOne(p);
+    }
     // a cancelled round leaves unregistered, invisible cards behind: drop them
-    for (const card of all) {
+    for (const card of [...all, ...docs]) {
       if (!card.dataset.kind) { expanders.delete(card); card.remove(); }
     }
   }
