@@ -592,6 +592,7 @@ img, video { -webkit-user-drag: none; }
 #memory-bar.is-open { pointer-events: auto; }
 #memory-bar .btn {
   justify-content: flex-start;
+  text-transform: lowercase;
   opacity: 0;
   transform: translateX(14px);
   transition: opacity 260ms ease, transform 420ms cubic-bezier(0.2, 0, 0, 1),
