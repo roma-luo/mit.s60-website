@@ -399,21 +399,36 @@ html, body, * { scrollbar-width: none; }
    small and dense, read like a printed sheet */
 .node--doc { width: 460px; }   /* sizeDoc sets the real width */
 .node--doc .node__body { padding: 14px; }
-.doc__text { color: var(--well-fg); font-size: 7.5px; line-height: 1.38; overflow-wrap: anywhere; column-gap: 16px; column-rule: 1px solid rgba(255,255,255,0.06); }
+/* one voice for the whole sheet: every element at the same size, weight
+   (light) and colour; headings, bold, italics, code and links are not set
+   apart, only paragraph and list breaks remain */
+.doc__text {
+  font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 7.5px;
+  font-weight: 300;
+  line-height: 1.38;
+  color: var(--well-fg);
+  overflow-wrap: anywhere;
+  column-gap: 16px;
+  column-rule: 1px solid rgba(255,255,255,0.06);
+}
+.doc__text * {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-decoration: none;
+  background: none;
+  border: none;
+}
 .doc__text > * { break-inside: avoid-column; }
 .doc__text > p, .doc__text > ul, .doc__text > ol { break-inside: auto; }
-.doc__text h2, .doc__text h3, .doc__text h4 { color: var(--fg); font-size: 1.15em; font-weight: 600; margin: 0.9em 0 0.3em; }
-.doc__text p + p, .doc__text p + ul, .doc__text ul + p, .doc__text p + ol { margin-top: 0.5em; }
-.doc__text ul, .doc__text ol { margin: 0.4em 0; padding-left: 1.2em; }
-.doc__text strong { color: var(--fg); font-weight: 600; }
-.doc__text a { color: var(--fg); }
-.doc__text blockquote { margin: 0.5em 0; padding-left: 0.8em; border-left: 1px solid rgba(255,255,255,0.25); color: var(--fg-3); }
-.doc__text hr { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 0.8em 0; }
-.doc__text table { width: 100%; border-collapse: collapse; margin: 0.5em 0; table-layout: fixed; }
-.doc__text th, .doc__text td { text-align: left; vertical-align: top; padding: 0.25em 0.35em; border-bottom: 1px solid rgba(255,255,255,0.10); }
-.doc__text th { color: var(--fg); font-weight: 600; }
-.doc__text pre { margin: 0.5em 0; padding: 0.5em; background: rgba(255,255,255,0.05); border-radius: 3px; white-space: pre-wrap; }
-.doc__text code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; }
+.doc__text > * + * { margin-top: 0.5em; }
+.doc__text ul, .doc__text ol { padding-left: 1.2em; }
+.doc__text blockquote { padding-left: 0.8em; }
+.doc__text pre { white-space: pre-wrap; }
+.doc__text table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.doc__text th, .doc__text td { text-align: left; vertical-align: top; padding: 0.15em 0.35em 0.15em 0; }
+.doc__text hr { display: none; }
 
 /* short text: no well, the content sits on the face */
 .node--short .node__body { padding: 14px 10px 8px; }
