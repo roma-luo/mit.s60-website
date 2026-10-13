@@ -96,6 +96,8 @@ export async function buildEntries() {
     // attachments (recordings etc.) pass through; URLs resolve against the
     // doc's own directory at display time
     if (fm.attachments && fm.attachments.length) entry.attachments = fm.attachments;
+    // a memory can point at its own page (e.g. week 4 -> liminal/): the bar button and index card open it
+    if (fm.link) entry.link = fm.link;
     entries.push(entry);
   }
   entries.sort((a, b) => a.file.localeCompare(b.file));

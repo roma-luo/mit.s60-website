@@ -453,6 +453,51 @@
       ],
       "file": "content/week3/04-reflection.md",
       "answer": "My reflection on Frontier Map. One-click prediction and history-driven warnings worked; the hold still risks reflex clicking, and task segmentation is the weakest part. Three real tasks show the loop works, not that it calibrates anyone yet. Most of the effort went into sensing, timing, focus and animation, not the LLM."
+    },
+    {
+      "id": "week4-build",
+      "label": "WEEK 04 BUILD",
+      "title": "Week 4 Weekly Build: Liminal",
+      "section": "week 4",
+      "tags": [
+        "week4",
+        "build",
+        "liminal",
+        "sleep onset",
+        "environment",
+        "eeg",
+        "brainco",
+        "sound",
+        "turntable",
+        "agents"
+      ],
+      "keywords": [
+        "week 4",
+        "week four",
+        "fourth week",
+        "weekly build",
+        "liminal",
+        "sleep",
+        "sleep onset",
+        "n1",
+        "edge of sleep",
+        "hypnagogia",
+        "brainco",
+        "eeg",
+        "headband",
+        "turntable",
+        "record",
+        "environment",
+        "web audio",
+        "blender",
+        "demo"
+      ],
+      "file": "content/week4/01-liminal.md",
+      "answer": "My week four build, Liminal: an agent environment for the edge of sleep. One real night of my BrainCo EEG is pressed into a record on a turntable. The tone arm only drops and music only plays when the agent steps in, to guide me toward light sleep, hold me there, and wake me gently to catch an idea.",
+      "attachments": [
+        "liminal-turntable.png"
+      ],
+      "link": "liminal/"
     }
   ]
 }

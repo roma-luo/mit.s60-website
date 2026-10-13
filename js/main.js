@@ -610,6 +610,8 @@ const UI = (() => {
       b.innerHTML = '<span class="btn__dot"></span><span class="btn__label"></span>';
       b.querySelector('.btn__label').textContent = g.label;
       b.addEventListener('click', () => {
+        const linked = g.entries.find(e => e.link);   // e.g. week 4 opens its own page
+        if (linked) { location.href = new URL(linked.link, document.baseURI).href; return; }
         bar.querySelectorAll('.btn.is-open').forEach(o => o.classList.remove('is-open'));
         b.classList.add('is-open');
         Agent.showEntries(g.entries, g.label);
@@ -697,6 +699,7 @@ const UI = (() => {
       card.appendChild(more);
       card.addEventListener('click', ev => {
         ev.preventDefault();
+        if (e.link) { location.href = new URL(e.link, document.baseURI).href; return; }
         hideIndex();
         Agent.showEntry(e);
       });
